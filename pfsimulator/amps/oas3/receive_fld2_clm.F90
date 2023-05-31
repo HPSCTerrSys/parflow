@@ -100,25 +100,23 @@ CHARACTER(len=19)                  :: foupname
  ENDDO
 !
 #ifdef READCLM
- evap_trans = 0.   !CPS initialize for masking
  DO i = 1, nx
    DO j = 1, ny
      DO k = 1, nlevsoil 
        IF ((topo_mask(i,j) .gt. 0) .and. (mask_land_sub(i,j) .gt. 0)) THEN                    !CPS mask bug fix
          l = 1+i + j_incr*(j) + k_incr*(topo_mask(i,j)-(k-1))  !
-         evap_trans(l) = frcv(i,j,k)
+         evap_trans(l) = evap_trans(l) + frcv(i,j,k)
        END IF
      ENDDO
    ENDDO
  ENDDO
 #else
- evap_trans = 0.   !CPS initialize for masking
  DO i = 1, nx
    DO j = 1, ny
      DO k = 1, nlevsoil 
        IF (topo_mask(i,j) .gt. 0) THEN                    !CPS mask bug fix
          l = 1+i + j_incr*(j) + k_incr*(topo_mask(i,j)-(k-1))  !
-         evap_trans(l) = frcv(i,j,k)
+         evap_trans(l) = evap_trans(l) + frcv(i,j,k)
        END IF
      ENDDO
    ENDDO
