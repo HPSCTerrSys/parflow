@@ -92,7 +92,7 @@ INTEGER                                    ::  status, pflncid,  &!
 !------------------------------------------------------------------------------
 !- Begin Subroutine oas_pfl_define 
 !------------------------------------------------------------------------------
-!
+#ifdef READCLM
 ! Read in land mask for each sub-domain to mask recv values from CLM
 ALLOCATE( mask_land_sub(nx,ny), stat = ierror )
 IF (ierror >0) CALL prism_abort_proto(comp_id, 'oas_pfl_define', 'Failure in allocating mask_land_sub')
@@ -108,6 +108,7 @@ DO ib = 0,npes-1
    mask_land_sub = mask_land_sub
   ENDIF
 ENDDO
+#endif
 
 
 !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

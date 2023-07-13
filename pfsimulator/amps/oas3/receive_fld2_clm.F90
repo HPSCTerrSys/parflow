@@ -99,6 +99,7 @@ CHARACTER(len=19)                  :: foupname
    IF( trcv(k)%laction )  CALL oas_pfl_rcv( k, isecs, frcv(:,:,k),nx, ny, info )
  ENDDO
 !
+#ifdef READCLM
  evap_trans = 0.   !CPS initialize for masking
  DO i = 1, nx
    DO j = 1, ny
@@ -110,6 +111,19 @@ CHARACTER(len=19)                  :: foupname
      ENDDO
    ENDDO
  ENDDO
+#else
+ evap_trans = 0.   !CPS initialize for masking
+ DO i = 1, nx
+   DO j = 1, ny
+     DO k = 1, nlevsoil 
+       IF (topo_mask(i,j) .gt. 0) THEN                    !CPS mask bug fix
+         l = 1+i + j_incr*(j) + k_incr*(topo_mask(i,j)-(k-1))  !
+         evap_trans(l) = frcv(i,j,k)
+       END IF
+     ENDDO
+   ENDDO
+ ENDDO
+#endif
 
 ! Debug ouput file
  IF ( IOASISDEBUGLVL == 1 ) THEN
