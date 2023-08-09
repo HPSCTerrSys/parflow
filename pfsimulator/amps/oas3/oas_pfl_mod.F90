@@ -70,7 +70,7 @@ contains
             READ(unit_number, '(A)', iostat=ios) line
             if (ios == 0 .and. index(line, "10SL_3.5m") > 0) then
                 nlevsoi = 10
-                nlevgrnd = 10
+                nlevgrnd = 15
             endif
         end do
     
@@ -78,7 +78,7 @@ contains
     close(unit_number)
     
     ! Print the value of soillevel
-    WRITE(*,*) "The value of nlevsoi is:", nlevsoi 
+    WRITE(6,*) "The value of nlevsoi is:", nlevsoi 
   
   end subroutine oas_pfl_init
 
