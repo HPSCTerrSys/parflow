@@ -278,14 +278,14 @@ typedef clock_t amps_CPUClock_t;
 #define amps_Clock() rtclock()
 #define amps_CPUClock() cpused()
 #define AMPS_TICKS_PER_SEC 1.5E8
-#define AMPS_CPU_TICKS_PER_SEC 1.5E8
+/*#define AMPS_CPU_TICKS_PER_SEC 1.5E8*/
 #endif
 
 #ifdef AMPS_NX_CLOCK
 typedef double amps_Clock_t;
 #define AMPS_TICKS_PER_SEC 1
 typedef double amps_CPUClock_t;
-#define AMPS_CPU_TICKS_PER_SEC 1
+/*#define AMPS_CPU_TICKS_PER_SEC 1*/
 #define amps_CPUClock() 1
 #endif
 
@@ -293,7 +293,7 @@ typedef double amps_CPUClock_t;
 #ifndef AMPS_TICKS_PER_SEC
 typedef long amps_Clock_t;
 typedef clock_t amps_CPUClock_t;
-extern long AMPS_CPU_TICKS_PER_SEC;
+/*extern long AMPS_CPU_TICKS_PER_SEC;*/
 #endif
 
 typedef MPI_Comm amps_Comm;
