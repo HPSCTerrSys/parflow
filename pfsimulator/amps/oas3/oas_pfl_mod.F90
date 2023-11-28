@@ -76,11 +76,35 @@ contains
     real (kind=8), intent(in) :: sw_lon,sw_lat,     & !  lat & lon of southwest corner (UNUSED)
                                  pdx,pdy,           & !  DX, DY (UNUSED)
                                  pfl_step, pfl_stop   !  parflow time step and stop time in hours (UNUSED)
+    INTEGER, DIMENSION(:,:), ALLOCATABLE      :: mask_land             ! Mask land
+    INTEGER, DIMENSION(:,:), ALLOCATABLE      :: mask_land_sub         ! Mask land
+    INTEGER, DIMENSION(:), ALLOCATABLE        :: reduced_index         ! Indices of masked points in eCLM
 
     ! Local variables
     integer  :: part_id       ! partition id returned by oasis_def_partition
     integer  :: il_paral(5)   ! partition descriptor (input to oasis_def_partition)
     integer  :: var_nodims(2) ! array dimensions of the coupling field (input to oasis_def_var)
+    integer  :: ib, npes, pflncid, pflvarid
+    
+    ALLOCATE( mask_land_sub(nx,ny), stat = ierror )
+    IF (ierror >0) CALL prism_abort_proto(comp_id, 'oas_pfl_define', 'Failure in allocating mask_land_sub')
+    CALL MPI_Comm_size(localComm, npes, ierror)
+    DO ib = 0,npes-1
+      IF (rank == ib ) THEN
+        status = nf90_open("clmgrid.nc", NF90_NOWRITE, pflncid)
+        status = nf90_inq_varid(pflncid, "LANDMASK" , pflvarid(3))
+        status = nf90_get_var(pflncid, pflvarid(3), mask_land_sub, &
+                         start = (/ix+1, iy+1/), &
+                         count = (/nx, ny/) )
+        status = nf90_inq_varid(pflncid, "LANDMASK_INDEX" , pflvarid(3))
+        status = nf90_get_var(pflncid, pflvarid(3), reduced_index, &
+                         start = (/ix+1/), &
+                         count = (/nx/) )
+        status = nf90_close(pflncid)
+        mask_land_sub = mask_land_sub
+        reduced_index = reduced_index
+      ENDIF
+    ENDDO
 
     ! 1) Define grid (not necessary*)
     !    * This step is not necessary since coupling fields don't have to be spatially
@@ -119,7 +143,65 @@ contains
 
     call oasis_enddef ( ierror )
     if (ierror /= 0) call oasis_abort (comp_id, 'oas_pfl_define', 'oasis_enddef failed')
+  
+   
   end subroutine oas_pfl_define
+  
+  subroutine remove_values(arr, mask, size1, size2, size3)
+    !----------------------------------------------------------------------------
+    ! Remove values of the ParFlow array that it matches the eCLM's
+    ! domain without masked values
+    ! 
+    !----------------------------------------------------------------------------
+    real, intent(inout) :: arr(:,:,:)
+    integer, intent(in) :: mask(:,:)
+    integer, intent(in) :: size1, size2, size3
+    
+    integer :: i, j, count
+    
+    ! Count the number of elements to keep
+    count = 0
+    do i = 1, size2
+        do j = 1, size3
+            if (mask(i,j) == 1) then
+                count = count + 1
+            endif
+        enddo
+    enddo
+    
+    ! Create a temporary array to store the values to keep
+    real, allocatable :: temp(:)
+    allocate(temp(size1, count))
+    
+    ! Copy values to the temporary array based on the mask
+    count = 0
+    do i = 1, size2
+        do j = 1, size3
+            if (mask(i,j) == 1) then
+                count = count + 1
+                temp(:, count) = arr(:, i, j)
+            endif
+        enddo
+    enddo
+    
+    ! Replace the original array with the filtered values
+    arr(:, :, :) = 0.0  ! Set all elements to 0 initially
+    do i = 1, size1
+        count = 0
+        do j = 1, size2
+            do k = 1, size3
+                if (mask(j,k) == 1) then
+                    count = count + 1
+                    arr(i, j, k) = temp(i, count)
+                endif
+            enddo
+        enddo
+    enddo
+    
+    ! Deallocate the temporary array
+    deallocate(temp)
+    
+  end subroutine remove_values
 
   subroutine send_fld2_clm(pressure, saturation, topo, ix, iy, nx, ny, nz, nx_f, ny_f, pstep, porosity, dz) bind(c, name='send_fld2_clm_')
     !----------------------------------------------------------------------------
@@ -167,6 +249,8 @@ contains
       end do
     end do
 
+    call remove_values(h2osoi_liq_3d, mask_land_sub, nx, ny, nz )
+    call remove_values(pressure_3d, mask_land_sub, nx, ny, nz )
     ! Send ParFlow fields to eCLM
     seconds_elapsed = nint(pstep*3600.d0)
     call oasis_put(soilliq_id, seconds_elapsed, h2osoi_liq_3d, ierror)
@@ -175,7 +259,25 @@ contains
     deallocate(h2osoi_liq_3d)
     deallocate(pressure_3d)
   end subroutine send_fld2_clm
+  
+  subroutine extend_eclm(parflow_array, eclm_array, indices , nx, ny, nz)
+    !-----------------------------------------------
+    ! Extend the shrinked eCLM input into full array.
+    !-----------------------------------------------
+  ! Define the size of your vectors and 3D array
+    integer, parameter :: nx, ny , nz 
+    real, intent(in) :: indices
+    real(kind=8), intent(in)  ::  eclm_array(:, :, :)
+    real(kind=8), intent(inout) :: parflow_array(:)
 
+    
+    eclm_flat = pack(eclm_array,.true.)    
+    ! Put values from the vector into the parflow array based on indices
+    parflow_array(indices) = eclm_flat
+    parflow_array = RESHAPE(parflow_array, (nz, nx, ny))
+    
+  end subroutine extend_eclm
+  
   subroutine receive_fld2_clm(evap_trans, topo, ix, iy, nx, ny, nz, nx_f, ny_f, pstep) bind(c, name='receive_fld2_clm_')
     !-----------------------------------------------
     ! Receives evapotranspiration fluxes from eCLM.
@@ -196,11 +298,14 @@ contains
     integer                     :: z                                ! subsurface level (z=nz topmost layer, z=1 deepest layer)
     integer                     :: top_z_level(nx,ny)               ! topmost z level of active ParFlow cells
     real(kind=8), allocatable   :: evap_trans_3d(:,:,:)             ! Root ET fluxes received from eCLM [1/hrs]
+    real(kind=8), allocatable   :: parflow_array(:,:,:)             ! Root ET fluxes received from eCLM but extended to ParFlow [1/hrs]
 
     ! Receive ET fluxes from eCLM
     allocate(evap_trans_3d(nx,ny,nlevsoi))
     seconds_elapsed = nint(pstep*3600.d0)
     call oasis_get(et_id, seconds_elapsed, evap_trans_3d, ierror)
+    extend_eclm(parflow_array, evap_trans_3d, reduced_index , nx, ny, nlevsoi)
+    evap_trans_3d = parflow_array
 
     ! Save ET fluxes to ParFlow evap_trans vector
     evap_trans = 0.
