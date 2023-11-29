@@ -36,6 +36,10 @@ module oas_pfl_mod
   ! TODO: Get these values from eCLM instead of hardcoding it here
   integer :: nlevsoi  = 20 ! Number of hydrologically active soil layers in eCLM
   integer :: nlevgrnd = 25 ! Total number of soil layers in eCLM
+  
+  INTEGER, DIMENSION(:,:), ALLOCATABLE      :: mask_land             ! Mask land
+  INTEGER, DIMENSION(:,:), ALLOCATABLE      :: mask_land_sub         ! Mask land
+  INTEGER, DIMENSION(:), ALLOCATABLE        :: reduced_index         ! Indices of masked points in eCLM
 
 contains
 
@@ -77,15 +81,13 @@ contains
     real (kind=8), intent(in) :: sw_lon,sw_lat,     & !  lat & lon of southwest corner (UNUSED)
                                  pdx,pdy,           & !  DX, DY (UNUSED)
                                  pfl_step, pfl_stop   !  parflow time step and stop time in hours (UNUSED)
-    INTEGER, DIMENSION(:,:), ALLOCATABLE      :: mask_land             ! Mask land
-    INTEGER, DIMENSION(:,:), ALLOCATABLE      :: mask_land_sub         ! Mask land
-    INTEGER, DIMENSION(:), ALLOCATABLE        :: reduced_index         ! Indices of masked points in eCLM
+
 
     ! Local variables
     integer  :: part_id       ! partition id returned by oasis_def_partition
     integer  :: il_paral(5)   ! partition descriptor (input to oasis_def_partition)
     integer  :: var_nodims(2) ! array dimensions of the coupling field (input to oasis_def_var)
-    integer  :: ib, npes, pflncid, pflvarid, status
+    integer  :: ib, npes, pflncid, pflvarid(3), status
     
     ALLOCATE( mask_land_sub(nx,ny), stat = ierror )
     IF (ierror >0) CALL prism_abort_proto(comp_id, 'oas_pfl_define', 'Failure in allocating mask_land_sub')
@@ -154,12 +156,12 @@ contains
     ! domain without masked values
     ! 
     !----------------------------------------------------------------------------
-    real, intent(inout) :: arr(:,:,:)
+    real(kind=8), intent(inout) :: arr(:,:,:)
     integer, intent(in) :: mask(:,:)
     integer, intent(in) :: size1, size2, size3
-    real, allocatable :: temp(:)
+    real, allocatable :: temp(:, :)
     
-    integer :: i, j, count
+    integer :: i, j, k, count
     
     ! Count the number of elements to keep
     count = 0
@@ -269,7 +271,7 @@ contains
   ! Define the size of your vectors and 3D array
     integer, intent(in) :: nx, ny , nz 
     real, intent(in) :: indices
-    real(kind=8), intent(in)  ::  eclm_array(:, :, :)
+    real(kind=8), intent(in)  ::  eclm_array(:, :, :), eclm_flat(:)
     real(kind=8), intent(inout) :: parflow_array(:)
 
     
@@ -306,7 +308,7 @@ contains
     allocate(evap_trans_3d(nx,ny,nlevsoi))
     seconds_elapsed = nint(pstep*3600.d0)
     call oasis_get(et_id, seconds_elapsed, evap_trans_3d, ierror)
-    extend_eclm(parflow_array, evap_trans_3d, reduced_index, nx, ny, nlevsoi)
+    call extend_eclm(parflow_array, evap_trans_3d, reduced_index, nx, ny, nlevsoi)
     evap_trans_3d = parflow_array
 
     ! Save ET fluxes to ParFlow evap_trans vector
