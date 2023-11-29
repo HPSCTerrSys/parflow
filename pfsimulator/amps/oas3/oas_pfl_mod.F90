@@ -7,6 +7,7 @@
 module oas_pfl_mod
   use iso_c_binding
   use mod_oasis
+  USE netcdf
   implicit none
   save
   private
@@ -84,7 +85,7 @@ contains
     integer  :: part_id       ! partition id returned by oasis_def_partition
     integer  :: il_paral(5)   ! partition descriptor (input to oasis_def_partition)
     integer  :: var_nodims(2) ! array dimensions of the coupling field (input to oasis_def_var)
-    integer  :: ib, npes, pflncid, pflvarid
+    integer  :: ib, npes, pflncid, pflvarid, status
     
     ALLOCATE( mask_land_sub(nx,ny), stat = ierror )
     IF (ierror >0) CALL prism_abort_proto(comp_id, 'oas_pfl_define', 'Failure in allocating mask_land_sub')
@@ -156,6 +157,7 @@ contains
     real, intent(inout) :: arr(:,:,:)
     integer, intent(in) :: mask(:,:)
     integer, intent(in) :: size1, size2, size3
+    real, allocatable :: temp(:)
     
     integer :: i, j, count
     
@@ -170,7 +172,7 @@ contains
     enddo
     
     ! Create a temporary array to store the values to keep
-    real, allocatable :: temp(:)
+    
     allocate(temp(size1, count))
     
     ! Copy values to the temporary array based on the mask
@@ -265,7 +267,7 @@ contains
     ! Extend the shrinked eCLM input into full array.
     !-----------------------------------------------
   ! Define the size of your vectors and 3D array
-    integer, parameter :: nx, ny , nz 
+    integer, intent(in) :: nx, ny , nz 
     real, intent(in) :: indices
     real(kind=8), intent(in)  ::  eclm_array(:, :, :)
     real(kind=8), intent(inout) :: parflow_array(:)
@@ -274,7 +276,7 @@ contains
     eclm_flat = pack(eclm_array,.true.)    
     ! Put values from the vector into the parflow array based on indices
     parflow_array(indices) = eclm_flat
-    parflow_array = RESHAPE(parflow_array, (nz, nx, ny))
+    parflow_array = RESHAPE(parflow_array, [nz, nx, ny])
     
   end subroutine extend_eclm
   
@@ -304,7 +306,7 @@ contains
     allocate(evap_trans_3d(nx,ny,nlevsoi))
     seconds_elapsed = nint(pstep*3600.d0)
     call oasis_get(et_id, seconds_elapsed, evap_trans_3d, ierror)
-    extend_eclm(parflow_array, evap_trans_3d, reduced_index , nx, ny, nlevsoi)
+    extend_eclm(parflow_array, evap_trans_3d, reduced_index, nx, ny, nlevsoi)
     evap_trans_3d = parflow_array
 
     ! Save ET fluxes to ParFlow evap_trans vector
