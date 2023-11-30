@@ -90,6 +90,7 @@ contains
     integer  :: ib, npes, pflncid, pflvarid(3), status
     
     ALLOCATE( mask_land_sub(nx,ny), stat = ierror )
+    ALLOCATE( reduced_index(nx*ny), stat = ierror )
     IF (ierror >0) CALL prism_abort_proto(comp_id, 'oas_pfl_define', 'Failure in allocating mask_land_sub')
     CALL MPI_Comm_size(localComm, npes, ierror)
     DO ib = 0,npes-1
@@ -270,8 +271,9 @@ contains
     !-----------------------------------------------
   ! Define the size of your vectors and 3D array
     integer, intent(in) :: nx, ny , nz 
-    real, intent(in) :: indices
-    real(kind=8), intent(in)  ::  eclm_array(:, :, :), eclm_flat(:)
+    integer, allocatable, intent(in) :: indices(:)
+    real(kind=8), intent(in)  ::  eclm_array(:, :, :) 
+    real (kind=8) :: eclm_flat(:)
     real(kind=8), intent(inout) :: parflow_array(:)
 
     
@@ -302,7 +304,7 @@ contains
     integer                     :: z                                ! subsurface level (z=nz topmost layer, z=1 deepest layer)
     integer                     :: top_z_level(nx,ny)               ! topmost z level of active ParFlow cells
     real(kind=8), allocatable   :: evap_trans_3d(:,:,:)             ! Root ET fluxes received from eCLM [1/hrs]
-    real(kind=8), allocatable   :: parflow_array(:,:,:)             ! Root ET fluxes received from eCLM but extended to ParFlow [1/hrs]
+    real(kind=8), allocatable   :: parflow_array(:)             ! Root ET fluxes received from eCLM but extended to ParFlow [1/hrs]
 
     ! Receive ET fluxes from eCLM
     allocate(evap_trans_3d(nx,ny,nlevsoi))
