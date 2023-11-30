@@ -272,15 +272,15 @@ contains
   ! Define the size of your vectors and 3D array
     integer, intent(in) :: nx, ny , nz 
     integer, allocatable, intent(in) :: indices(:)
-    real(kind=8), intent(in)  ::  eclm_array(:, :, :) 
+    real(kind=8), intent(inout)  ::  eclm_array(:, :, :) 
     real (kind=8) :: eclm_flat(nx*ny*nz)
-    real(kind=8), intent(inout) :: parflow_array(:,:,:)
+    real(kind=8), intent(inout) :: parflow_array(:)
 
     
     eclm_flat = pack(eclm_array,.true.)    
     ! Put values from the vector into the parflow array based on indices
     parflow_array(indices) = eclm_flat
-    parflow_array = RESHAPE(parflow_array, [nz, nx, ny])
+    eclm_array = RESHAPE(parflow_array, [nz, nx, ny])
     
   end subroutine extend_eclm
   
@@ -304,11 +304,11 @@ contains
     integer                     :: z                                ! subsurface level (z=nz topmost layer, z=1 deepest layer)
     integer                     :: top_z_level(nx,ny)               ! topmost z level of active ParFlow cells
     real(kind=8), allocatable   :: evap_trans_3d(:,:,:)             ! Root ET fluxes received from eCLM [1/hrs]
-    real(kind=8), allocatable   :: parflow_array(:,:,:)             ! Root ET fluxes received from eCLM but extended to ParFlow [1/hrs]
+    real(kind=8), allocatable   :: parflow_array(:)             ! Root ET fluxes received from eCLM but extended to ParFlow [1/hrs]
 
     ! Receive ET fluxes from eCLM
     allocate(evap_trans_3d(nx,ny,nlevsoi))
-    allocate(parflow_array(nx,ny,nlevsoi))
+    allocate(parflow_array(nx*ny*nlevsoi))
     seconds_elapsed = nint(pstep*3600.d0)
     call oasis_get(et_id, seconds_elapsed, evap_trans_3d, ierror)
     call extend_eclm(parflow_array, evap_trans_3d, reduced_index, nx, ny, nlevsoi)
