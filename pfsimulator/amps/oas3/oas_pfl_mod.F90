@@ -166,8 +166,8 @@ contains
     
     ! Count the number of elements to keep
     count = 0
-    do i = 1, size2
-        do j = 1, size3
+    do i = 1, size1
+        do j = 1, size2
             if (mask(i,j) == 1) then
                 count = count + 1
             endif
@@ -176,28 +176,28 @@ contains
     
     ! Create a temporary array to store the values to keep
     
-    allocate(temp(size1, count))
+    allocate(temp(count, size3))
     
     ! Copy values to the temporary array based on the mask
     count = 0
-    do i = 1, size2
-        do j = 1, size3
+    do i = 1, size1
+        do j = 1, size2
             if (mask(i,j) == 1) then
                 count = count + 1
-                temp(:, count) = arr(:, i, j)
+                temp(count, :) = arr(i, j, :)
             endif
         enddo
     enddo
     
     ! Replace the original array with the filtered values
     arr(:, :, :) = 0.0  ! Set all elements to 0 initially
-    do i = 1, size1
+    do i = 1, size3
         count = 0
-        do j = 1, size2
-            do k = 1, size3
+        do j = 1, size1
+            do k = 1, size2
                 if (mask(j,k) == 1) then
                     count = count + 1
-                    arr(i, j, k) = temp(i, count)
+                    arr(j, k, i) = temp(count, i)
                 endif
             enddo
         enddo
