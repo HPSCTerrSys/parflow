@@ -91,7 +91,7 @@ contains
     
     ALLOCATE( mask_land_sub(nx,ny), stat = ierror )
     ALLOCATE( reduced_index(nx*ny), stat = ierror )
-    IF (ierror >0) CALL prism_abort_proto(comp_id, 'oas_pfl_define', 'Failure in allocating mask_land_sub')
+    IF (ierror >0) CALL oasis_abort(comp_id, 'oas_pfl_init', 'Failure in allocating mask_land_sub')
     CALL MPI_Comm_size(localComm, npes, ierror)
     DO ib = 0,npes-1
       IF (rank == ib ) THEN
@@ -312,7 +312,7 @@ contains
     seconds_elapsed = nint(pstep*3600.d0)
     call oasis_get(et_id, seconds_elapsed, evap_trans_3d, ierror)
     call extend_eclm(parflow_array, evap_trans_3d, reduced_index, nx, ny, nlevsoi)
-    evap_trans_3d = parflow_array
+
 
     ! Save ET fluxes to ParFlow evap_trans vector
     evap_trans = 0.
