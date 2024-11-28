@@ -5,9 +5,11 @@ set(COMMON_SRC_FILES amps_abort.c amps_clear.c amps_clock.c
   amps_invoice.c amps_io.c amps_newhandle.c amps_newpackage.c
   amps_sfbcast.c amps_sfclose.c amps_sfopen.c amps_wait.c signal.c amps_print.c)
 
-list(APPEND HEADER_FILES common/amps_common.h
-                        ${PARFLOW_AMPS_LAYER}/amps.h
-                        ${PARFLOW_AMPS_LAYER}/amps_proto.h)
+if (USE_PDAF)
+  list(APPEND HEADER_FILES common/amps_common.h
+                          ${PARFLOW_AMPS_LAYER}/amps.h
+                          ${PARFLOW_AMPS_LAYER}/amps_proto.h)
+endif()
 
 string(REGEX REPLACE "([^;]+)" "common/\\1" COMMON_SRC_FILES "${COMMON_SRC_FILES}")
 

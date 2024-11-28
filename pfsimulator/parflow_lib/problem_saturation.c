@@ -654,6 +654,7 @@ void     Saturation(
   }          /* End switch */
 }
 
+#ifdef USE_PDAF
 /*--------------------------------------------------------------------------
  * SaturationGetAlpha
  *--------------------------------------------------------------------------*/
@@ -681,6 +682,7 @@ Vector *SaturationGetN(PFModule *this_module)
 
     return (dummy1 -> n_values);
 }
+#endif
 
 /*--------------------------------------------------------------------------
  * SaturationInitInstanceXtra
