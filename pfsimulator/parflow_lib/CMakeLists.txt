@@ -300,6 +300,8 @@ if (${PARFLOW_HAVE_NETCDF})
 endif (${PARFLOW_HAVE_NETCDF})
 
 if (USE_PDAF)
+  target_compile_definitions(pfsimulator PUBLIC USE_PDAF)
+
   # Install headers
   set (HEADER_FILES
     backend_mapping.h
