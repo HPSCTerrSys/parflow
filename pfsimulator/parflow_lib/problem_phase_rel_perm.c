@@ -2179,6 +2179,7 @@ int  PhaseRelPermSizeOfTempData()
   return sz;
 }
 
+#ifdef USE_PDAF
 /*-----------------------------------------------------------------------
  * PhaseRelPermGetAlpha
  *-----------------------------------------------------------------------*/
@@ -2206,3 +2207,4 @@ Vector *PhaseRelPermGetN(PFModule *this_module)
 
   return (dummy1 -> n_values);
 }
+#endif

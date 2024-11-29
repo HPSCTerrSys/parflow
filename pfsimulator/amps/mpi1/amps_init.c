@@ -35,8 +35,9 @@
 #include <unistd.h>
 #include <inttypes.h>
 
+#ifdef USE_PDAF
 MPI_Comm dacomm; /* kuw */
-
+#endif
 /* Global flag indicating if AMPS has been initialized */
 int amps_mpi_initialized = FALSE;
 
@@ -116,10 +117,16 @@ int amps_Init(int *argc, char **argv[])
   int length;
 #endif
 
-  /* MPI_Init(argc, argv); */
+#ifndef USE_PDAF
+  MPI_Init(argc, argv);
+#endif
   amps_mpi_initialized = TRUE;
 
+#ifdef USE_PDAF
   MPI_Comm_dup(dacomm, &amps_CommWorld);
+#else
+  MPI_Comm_dup(MPI_COMM_WORLD, &amps_CommWorld);
+#endif
 
   MPI_Comm_size(amps_CommWorld, &amps_size);
   MPI_Comm_rank(amps_CommWorld, &amps_rank);

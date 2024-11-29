@@ -1711,8 +1711,11 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
   double sw_lon = .0;
 #endif
 
-int           istep = 1;
-
+#ifdef USE_PDAF
+  int istep = 1;
+  int Stepcount = 0;            /* Added for transient EvapTrans file management - NBE */
+  int Loopcount = 0;            /* Added for transient EvapTrans file management - NBE */
+#endif
 #ifdef HAVE_CLM
   Grid *grid = (instance_xtra->grid);
   Subgrid *subgrid;
@@ -1720,7 +1723,9 @@ int           istep = 1;
   double *pp, *sp, *et, *ms, *po_dat, *dz_dat;
 
   /* IMF: For CLM met forcing (local to AdvanceRichards) */
+#ifndef USE_PDAF
   int istep;                    // IMF: counter for clm output times
+#endif
 
   /* NBE added for clm reuse of inputs */
   int clm_next = 1;             //NBE: Counter for reuse loop
@@ -1733,9 +1738,11 @@ int           istep = 1;
   int fflag, fstart, fstop;     // IMF: index w/in 3D forcing array corresponding to istep
   int n, c;                     // IMF: index vars for looping over subgrid data BH: added c
   int ind_veg;                  /*BH: temporary variable to store vegetation index */
-  /* int Stepcount = 0;            /\* Added for transient EvapTrans file management - NBE *\/ */
-  /* int Loopcount = 0;            /\* Added for transient EvapTrans file management - NBE *\/ */
-  double sw=NAN, lw=NAN, prcp=NAN, tas=NAN, u=NAN, v=NAN, patm=NAN, qatm=NAN;   // IMF: 1D forcing vars (local to AdvanceRichards)
+#ifndef USE_PDAF
+  int Stepcount = 0;            /* Added for transient EvapTrans file management - NBE */
+  int Loopcount = 0;            /* Added for transient EvapTrans file management - NBE */
+#endif
+  double sw = NAN, lw = NAN, prcp = NAN, tas = NAN, u = NAN, v = NAN, patm = NAN, qatm = NAN;   // IMF: 1D forcing vars (local to AdvanceRichards)
   double lai[18], sai[18], z0m[18], displa[18]; /*BH: array with lai/sai/z0m/displa values for each veg class */
   double *sw_data = NULL;
   double *lw_data = NULL;
@@ -1799,8 +1806,6 @@ int           istep = 1;
   char file_prefix[2048], file_type[2048], file_postfix[2048];
   char nc_postfix[2048];
 
-  int Stepcount = 0;            /* Added for transient EvapTrans file management - NBE */
-  int Loopcount = 0;            /* Added for transient EvapTrans file management - NBE */
   int first_tstep = 1;
 
   sprintf(file_prefix, "%s", GlobalsOutFileName);
@@ -1811,29 +1816,32 @@ int           istep = 1;
   int nlat = GetInt("ComputationalGrid.NY");
   double pfl_step = GetDouble("TimeStep.Value");
   double pfl_stop = GetDouble("TimingInfo.StopTime");
-	// PDAF: getting start time
+#ifdef USE_PDAF
+        // PDAF: getting start time
 	double pfl_start = GetDouble("TimingInfo.StartTime");
-
+#endif
   int is;
-  /* ForSubgridI(is, GridSubgrids(grid)) */
-  /* { */
-  /*   double dx, dy; */
-  /*   int nx, ny, ix, iy; */
+#ifndef USE_PDAF
+  ForSubgridI(is, GridSubgrids(grid))
+  {
+    double dx, dy;
+    int nx, ny, ix, iy;
 
-  /*   subgrid = GridSubgrid(grid, is); */
+    subgrid = GridSubgrid(grid, is);
 
-  /*   nx = SubgridNX(subgrid); */
-  /*   ny = SubgridNY(subgrid); */
+    nx = SubgridNX(subgrid);
+    ny = SubgridNY(subgrid);
 
-  /*   ix = SubgridIX(subgrid); */
-  /*   iy = SubgridIY(subgrid); */
+    ix = SubgridIX(subgrid);
+    iy = SubgridIY(subgrid);
 
-  /*   dx = SubgridDX(subgrid); */
-  /*   dy = SubgridDY(subgrid); */
+    dx = SubgridDX(subgrid);
+    dy = SubgridDY(subgrid);
 
-    // CALL_oas_pfl_define(nx, ny, dx, dy, ix, iy, sw_lon, sw_lat, nlon, nlat,
-    //                     pfl_step, pfl_stop);
-  /* } */
+    CALL_oas_pfl_define(nx, ny, dx, dy, ix, iy, sw_lon, sw_lat, nlon, nlat,
+                        pfl_step, pfl_stop);
+  }
+#endif
   amps_Sync(amps_CommWorld);
 #endif // end to HAVE_OAS3 CALL
 
@@ -1858,6 +1866,7 @@ int           istep = 1;
   }
   dt = cdt;
 
+#ifdef USE_PDAF
 /* #ifdef FOR2131 */
 /*    PFModuleInvokeType(SaturationInvoke, problem_saturation, */
 /*                      (instance_xtra -> saturation, instance_xtra -> pressure, */
@@ -1875,6 +1884,7 @@ int           istep = 1;
 /*   // WritePFBinary(file_prefix, file_postfix, ProblemDataPermeabilityX(problem_data)); */
 
 /* #endif */
+#endif
   /*
    * Check to see if pressure solves are requested
    * start_count < 0 implies that subsurface data ONLY is requested
@@ -1902,6 +1912,7 @@ int           istep = 1;
   {
     if (t == ct)
     {
+#ifdef USE_PDAF
         if (time_step_control)
         {
           PFModuleInvokeType(SelectTimeStepInvoke, time_step_control,
@@ -1914,7 +1925,7 @@ int           istep = 1;
                              (&dt, &dt_info, t, problem,
                               problem_data));
         }
-
+#endif
       ct += cdt;
 
       // Read in evap_trans even if not HAVE_CLM
@@ -2628,10 +2639,10 @@ int           istep = 1;
 
       handle = InitVectorUpdate(evap_trans, VectorUpdateAll);
       FinalizeVectorUpdate(handle);
-
-
-
-
+#endif
+#if defined HAVE_CLM || defined USE_PDAF
+#ifdef USE_PDAF
+#ifdef HAVE_CLM
       //#endif   //End of call to CLM
       /* NBE counter for reusing CLM input files */
       clm_next += 1;
@@ -2654,9 +2665,9 @@ int           istep = 1;
        *  It is using the different time step counter BUT then it
        *  isn't scaling the inputs properly.
        *  ============================================================= */
-#endif	// End of call to CLM
-
+#endif // end to HAVE_CLM CALL
           istep = istep + 1;
+#endif // end to USE_PDAF CALL
       /******************************************/
       /*    read transient evap trans flux file */
       /******************************************/
@@ -2710,28 +2721,30 @@ int           istep = 1;
       }
 
 
-//       /* NBE counter for reusing CLM input files */
-//       clm_next += 1;
-//       if (clm_next > clm_skip)
-//       {
-//         istep = istep + 1;
-//         clm_next = 1;
-//       }                         // NBE
+#ifndef USE_PDAF
+      /* NBE counter for reusing CLM input files */
+      clm_next += 1;
+      if (clm_next > clm_skip)
+      {
+        istep = istep + 1;
+        clm_next = 1;
+      }                         // NBE
 
-//       //istep  = istep + 1;
+      //istep  = istep + 1;
 
-//       EndTiming(CLMTimingIndex);
+      EndTiming(CLMTimingIndex);
 
 
-//       /* =============================================================
-//        *  NBE: It looks like the time step isn't really scaling the CLM
-//        *  inputs, but the looping flag is working as intended as
-//        *  of 2014-04-06.
-//        *
-//        *  It is using the different time step counter BUT then it
-//        *  isn't scaling the inputs properly.
-//        *  ============================================================= */
-// #endif
+      /* =============================================================
+       *  NBE: It looks like the time step isn't really scaling the CLM
+       *  inputs, but the looping flag is working as intended as
+       *  of 2014-04-06.
+       *
+       *  It is using the different time step counter BUT then it
+       *  isn't scaling the inputs properly.
+       *  ============================================================= */
+#endif
+#endif // end of HAVE_CLM || USE_PDAF CALL
     }                           //Endif to check whether an entire dt is complete
 
     converged = 1;
@@ -2753,19 +2766,20 @@ int           istep = 1;
       /*******************************************************************/
       if (converged)
       {
-        // if (time_step_control)
-        // {
-        //   PFModuleInvokeType(SelectTimeStepInvoke, time_step_control,
-        //                      (&dt, &dt_info, t, problem,
-        //                       problem_data));
-        // }
-        // else
-        // {
-        //   PFModuleInvokeType(SelectTimeStepInvoke, select_time_step,
-        //                      (&dt, &dt_info, t, problem,
-        //                       problem_data));
-        // }
-
+#ifndef USE_PDAF
+        if (time_step_control)
+        {
+          PFModuleInvokeType(SelectTimeStepInvoke, time_step_control,
+                             (&dt, &dt_info, t, problem,
+                              problem_data));
+        }
+        else
+        {
+          PFModuleInvokeType(SelectTimeStepInvoke, select_time_step,
+                             (&dt, &dt_info, t, problem,
+                              problem_data));
+        }
+#endif
         PFVCopy(instance_xtra->density, instance_xtra->old_density);
         PFVCopy(instance_xtra->saturation,
                 instance_xtra->old_saturation);
@@ -4414,6 +4428,7 @@ int           istep = 1;
   *saturation_out = instance_xtra->saturation;
 }
 
+#ifdef USE_PDAF
 // Compare to AdvanceRichards() in parflow v3.9.0
 void
 PseudoAdvanceRichards(PFModule * this_module, double start_time,      /* Starting time */
@@ -4595,6 +4610,7 @@ PseudoAdvanceRichards(PFModule * this_module, double start_time,      /* Startin
 #endif // end to HAVE_OAS3 CALL
 }
 
+#endif // end to USE_PDAF CALL
 void
 ExportRichards(PFModule * this_module,
                Vector **  pressure_out, /* Output vars */
@@ -6358,6 +6374,7 @@ GetProblemDataRichards(PFModule * this_module)
   return(instance_xtra->problem_data);
 }
 
+#ifdef USE_PDAF
 PFModule *GetPhaseRelPerm(PFModule *this_module){
    InstanceXtra *instance_xtra 	= (InstanceXtra *)PFModuleInstanceXtra(this_module);
    return (instance_xtra -> phase_rel_perm);
@@ -6367,6 +6384,7 @@ PFModule *GetSaturation(PFModule *this_module){
    InstanceXtra *instance_xtra 	= (InstanceXtra *)PFModuleInstanceXtra(this_module);
    return (instance_xtra -> problem_saturation);
 }
+#endif
 
 Problem *
 GetProblemRichards(PFModule * this_module)
@@ -6385,6 +6403,7 @@ GetICPhasePressureRichards(PFModule * this_module)
   return(instance_xtra->ic_phase_pressure);
 }
 
+#ifdef USE_PDAF
 Vector *GetPressureRichards(PFModule *this_module)
 {
   InstanceXtra  *instance_xtra    =
@@ -6424,6 +6443,7 @@ char *GetEvapTransFilename(PFModule *this_module)
 
   return (public_xtra -> evap_trans_filename);
 }
+#endif // end to USE_PDAF CALL
 
 Grid *
 GetGrid2DRichards(PFModule * this_module)
