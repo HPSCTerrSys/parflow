@@ -2642,6 +2642,7 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
 #endif
 #if defined HAVE_CLM || defined USE_PDAF
 #ifdef USE_PDAF
+#ifdef HAVE_CLM
       //#endif   //End of call to CLM
       /* NBE counter for reusing CLM input files */
       clm_next += 1;
@@ -2664,8 +2665,9 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
        *  It is using the different time step counter BUT then it
        *  isn't scaling the inputs properly.
        *  ============================================================= */
+#endif // end to HAVE_CLM CALL
           istep = istep + 1;
-#endif
+#endif // end to USE_PDAF CALL
       /******************************************/
       /*    read transient evap trans flux file */
       /******************************************/
