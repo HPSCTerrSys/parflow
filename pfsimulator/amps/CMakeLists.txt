@@ -6,7 +6,6 @@ set(COMMON_SRC_FILES amps_abort.c amps_clear.c amps_clock.c
   amps_sfbcast.c amps_sfclose.c amps_sfopen.c amps_wait.c signal.c amps_print.c)
 
 if (USE_PDAF)
-  target_compile_definitions(amps PUBLIC USE_PDAF)
   list(APPEND HEADER_FILES common/amps_common.h
                           ${PARFLOW_AMPS_LAYER}/amps.h
                           ${PARFLOW_AMPS_LAYER}/amps_proto.h)
@@ -47,6 +46,9 @@ if(${PARFLOW_HAVE_OAS3})
   list(APPEND HEADER_FILES oas3/oas3_coupler.h oas3/oas3_external.h)
 endif(${PARFLOW_HAVE_OAS3})
 
+if (USE_PDAF)
+  target_compile_definitions(amps PUBLIC USE_PDAF)
+endif()
 
 install(TARGETS amps DESTINATION lib)
 
