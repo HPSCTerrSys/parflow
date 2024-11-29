@@ -43,7 +43,9 @@ if(${PARFLOW_HAVE_OAS3})
   
   target_link_libraries(amps ${NETCDF_Fortran_LIBRARY})
   target_include_directories(amps PUBLIC "${NETCDF_Fortran_INCLUDES}")
-  list(APPEND HEADER_FILES oas3/oas3_coupler.h oas3/oas3_external.h)
+  if (USE_PDAF)
+    list(APPEND HEADER_FILES oas3/oas3_coupler.h oas3/oas3_external.h)
+  endif()
 endif(${PARFLOW_HAVE_OAS3})
 
 if (USE_PDAF)
@@ -57,9 +59,11 @@ set(AMPS_SCRIPTS run)
 string(REGEX REPLACE "([^;]+)" "${PARFLOW_AMPS_LAYER}/\\1" AMPS_SCRIPTS "${AMPS_SCRIPTS}")
 install(FILES ${AMPS_SCRIPTS} DESTINATION bin)
 
-# Install headers
-install(FILES ${HEADER_FILES}
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/parflow)
+if (USE_PDAF)
+  # Install headers
+  install(FILES ${HEADER_FILES}
+          DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/parflow)
+endif()
 
 add_subdirectory (test/src)
 
