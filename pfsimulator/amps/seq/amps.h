@@ -42,6 +42,17 @@
 #include <stdlib.h>
 #endif
 
+#ifdef PARFLOW_HAVE_CUDA
+#include <cuda.h>
+#include <cuda_runtime.h>
+#endif
+#ifdef PARFLOW_HAVE_RMM
+#include "amps_rmm_wrapper.h"
+#endif
+#ifdef PARFLOW_HAVE_UMPIRE
+#include "amps_umpire_wrapper.h"
+#endif
+
 #define AMPS_EXCHANGE_SPECIALIZED
 #define AMPS_FOPEN_SPECIALIZED
 #define AMPS_NEWHANDLE_SPECIALIZED
@@ -63,6 +74,17 @@
 
 typedef int amps_Comm;
 typedef FILE *amps_File;
+
+/* SGS this should be fixed; someone exposed internal variables rather than using
+ * the API macros */
+/* Node level ranks and size of nodeComm */
+#define amps_node_rank 0
+#define amps_node_size 1
+
+/* Writing proc ranks and size of writeComm */
+extern int amps_write_rank;
+extern int amps_write_size;
+
 
 #define amps_FreeHandle(handle) free((handle));
 #define amps_Rank(comm) 0
@@ -401,6 +423,175 @@ typedef struct amps_HandleObject {
 
 #define AMPS_INVOICE_ALLOCATED 1
 #define AMPS_INVOICE_OVERLAYED 2
+
+#ifdef PARFLOW_HAVE_CUDA
+/*--------------------------------------------------------------------------
+ * Amps defines with CUDA
+ *--------------------------------------------------------------------------*/
+
+/**
+ * @brief Operation modes for amps_gpupacking function
+ *
+ * @note See function description for amps_gpupacking.
+ *
+ * @{
+ */
+#define AMPS_GETRBUF 1
+#define AMPS_GETSBUF 2
+#define AMPS_PACK 4
+#define AMPS_UNPACK 8
+/** @} */
+
+#if defined(PARFLOW_HAVE_CUDA) || defined(PARFLOW_HAVE_KOKKOS)
+
+/*--------------------------------------------------------------------------
+ *  GPU error handling macros
+ *--------------------------------------------------------------------------*/
+
+/**
+ * @brief CUDA error handling
+ *
+ * If error detected, print error message and exit.
+ *
+ * @param expr CUDA error (of type cudaError_t) [IN]
+ */
+#define CUDA_ERRCHK(err) (amps_cuda_error(err, __FILE__, __LINE__))
+static inline void amps_cuda_error(cudaError_t err, const char *file, int line)
+{
+  if (err != cudaSuccess)
+  {
+    printf("\n\n%s in %s at line %d\n", cudaGetErrorString(err), file, line);
+    exit(1);
+  }
+}
+#endif // PARFLOW_HAVE_CUDA || PARFLOW_HAVE_KOKKOS
+
+
+/*--------------------------------------------------------------------------
+ * Define static unified memory allocation routines for devices
+ *--------------------------------------------------------------------------*/
+
+/**
+ * @brief Kokkos C wrapper declaration for memory allocation.
+ */
+void* kokkosUVMAlloc(size_t size);
+
+/**
+ * @brief Kokkos C wrapper declaration for memory deallocation.
+ */
+void kokkosUVMFree(void *ptr);
+
+/**
+ * @brief Kokkos C wrapper declaration for memory copy.
+ */
+void kokkosMemCpyUVMToUVM(char *dest, char *src, size_t size);
+
+/**
+ * @brief Kokkos C wrapper declaration for memset.
+ */
+void kokkosMemSetAmps(char *ptr, size_t size);
+
+/**
+ * @brief Allocates unified memory
+ *
+ * If RMM library is available, pool allocation is used for better performance.
+ *
+ * @note Should not be called directly.
+ *
+ * @param size bytes to be allocated [IN]
+ * @return a void pointer to the allocated dataspace
+ */
+static inline void *_amps_talloc_device(size_t size)
+{
+  void *ptr = NULL;
+
+#ifdef PARFLOW_HAVE_RMM
+  ptr = amps_rmmAlloc(size);
+#elif defined(PARFLOW_HAVE_UMPIRE)
+  ptr = amps_umpireAlloc(size);
+#elif defined(PARFLOW_HAVE_KOKKOS)
+  ptr = kokkosUVMAlloc(size);
+#elif defined(PARFLOW_HAVE_CUDA)
+  CUDA_ERRCHK(cudaMallocManaged((void**)&ptr, size, cudaMemAttachGlobal));
+  // CUDA_ERRCHK(cudaHostAlloc((void**)&ptr, size, cudaHostAllocMapped));
+#endif
+
+  return ptr;
+}
+
+/**
+ * @brief Allocates unified memory initialized to 0
+ *
+ * If RMM library is available, pool allocation is used for better performance.
+ *
+ * @note Should not be called directly.
+ *
+ * @param size bytes to be allocated [IN]
+ * @return a void pointer to the allocated dataspace
+ */
+static inline void *_amps_ctalloc_device(size_t size)
+{
+  void *ptr = NULL;
+
+#ifdef PARFLOW_HAVE_RMM
+  ptr = amps_rmmAlloc(size);
+#elif defined(PARFLOW_HAVE_UMPIRE)
+  ptr = amps_umpireAlloc(size);
+#elif defined(PARFLOW_HAVE_KOKKOS)
+  ptr = kokkosUVMAlloc(size);
+#elif defined(PARFLOW_HAVE_CUDA)
+  CUDA_ERRCHK(cudaMallocManaged((void**)&ptr, size, cudaMemAttachGlobal));
+  // CUDA_ERRCHK(cudaHostAlloc((void**)&ptr, size, cudaHostAllocMapped));
+#endif
+
+#if defined(PARFLOW_HAVE_CUDA)
+  CUDA_ERRCHK(cudaMemset(ptr, 0, size));
+#else
+  // memset(ptr, 0, size);
+  kokkosMemSetAmps((char*)ptr, size);
+#endif
+
+  return ptr;
+}
+
+/**
+ * @brief Frees unified memory allocated with \ref _talloc_cuda or \ref _ctalloc_cuda
+ *
+ * @note Should not be called directly.
+ *
+ * @param ptr a void pointer to the allocated dataspace [IN]
+ */
+static inline void _amps_tfree_device(void *ptr)
+{
+#ifdef PARFLOW_HAVE_RMM
+  amps_rmmFree(ptr);
+#elif defined(PARFLOW_HAVE_UMPIRE)
+  amps_umpireFree(ptr);
+#elif defined(PARFLOW_HAVE_KOKKOS)
+  kokkosUVMFree(ptr);
+#elif defined(PARFLOW_HAVE_CUDA)
+  CUDA_ERRCHK(cudaFree(ptr));
+  // CUDA_ERRCHK(cudaFreeHost(ptr));
+#endif
+}
+
+/**
+ * Same as \ref amps_TAlloc but allocates managed memory
+ */
+#define amps_TAlloc_managed(type, count) ((count > 0) ? (type*)_amps_talloc_device((unsigned int)(sizeof(type) * (count))) : NULL)
+
+/**
+ * Same as \ref amps_CTAlloc but allocates managed memory
+ */
+#define amps_CTAlloc_managed(type, count) ((count) ? (type*)_amps_ctalloc_device((unsigned int)(sizeof(type) * (count))) : NULL)
+
+/**
+ * Same as \ref amps_TFree but deallocates managed memory
+ */
+#define amps_TFree_managed(ptr) if (ptr) _amps_tfree_device(ptr); else {}
+
+#endif // PARFLOW_HAVE_CUDA || PARFLOW_HAVE_KOKKOS
+
 
 #include "amps_proto.h"
 
