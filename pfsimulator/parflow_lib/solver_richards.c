@@ -1707,8 +1707,8 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
   Subgrid *subgrid;
   Subvector *p_sub, *s_sub, *et_sub, *m_sub, *po_sub, *dz_sub;
   double *pp, *sp, *et, *ms, *po_dat, *dz_dat;
-  double sw_lat = .0;
-  double sw_lon = .0;
+  /* double sw_lat = .0; */
+  /* double sw_lon = .0; */
 #endif
 
 int           istep = 1;
@@ -1807,12 +1807,12 @@ int           istep = 1;
 
   //CPS oasis definition phase
 #ifdef HAVE_OAS3
-  int nlon = GetInt("ComputationalGrid.NX");
-  int nlat = GetInt("ComputationalGrid.NY");
-  double pfl_step = GetDouble("TimeStep.Value");
-  double pfl_stop = GetDouble("TimingInfo.StopTime");
-	// PDAF: getting start time
-	double pfl_start = GetDouble("TimingInfo.StartTime");
+  /* int nlon = GetInt("ComputationalGrid.NX"); */
+  /* int nlat = GetInt("ComputationalGrid.NY"); */
+  /* double pfl_step = GetDouble("TimeStep.Value"); */
+  /* double pfl_stop = GetDouble("TimingInfo.StopTime"); */
+  /* 	// PDAF: getting start time */
+  /* 	double pfl_start = GetDouble("TimingInfo.StartTime"); */
 
   int is;
   /* ForSubgridI(is, GridSubgrids(grid)) */
