@@ -4928,10 +4928,10 @@ PseudoAdvanceRichards(PFModule * this_module, double start_time,      /* Startin
   printf("Pseudo richard for OAS init\n");
   //>>TSMP-PDAF internal change end
 
-  PublicXtra *public_xtra = (PublicXtra*)PFModulePublicXtra(this_module);
+  /* PublicXtra *public_xtra = (PublicXtra*)PFModulePublicXtra(this_module); */
   InstanceXtra *instance_xtra =
     (InstanceXtra*)PFModuleInstanceXtra(this_module);
-  Problem *problem = (public_xtra->problem);
+  /* Problem *problem = (public_xtra->problem); */
 
   /* int max_iterations = (public_xtra->max_iterations); */
   /* int print_satur = (public_xtra->print_satur); */
@@ -4943,7 +4943,7 @@ PseudoAdvanceRichards(PFModule * this_module, double start_time,      /* Startin
   /* PFModule *l2_error_norm = (instance_xtra->l2_error_norm); */
   /* PFModule *nonlin_solver = (instance_xtra->nonlin_solver); */
 
-  ProblemData *problem_data = (instance_xtra->problem_data);
+  /* ProblemData *problem_data = (instance_xtra->problem_data); */
 
   /* int start_count = ProblemStartCount(problem); */
   /* double dump_interval = ProblemDumpInterval(problem); */
@@ -5045,7 +5045,7 @@ PseudoAdvanceRichards(PFModule * this_module, double start_time,      /* Startin
   /* VectorUpdateCommHandle *handle; */
 
   /* char dt_info; */
-  char file_prefix[2048]//, file_type[2048], file_postfix[2048];
+  char file_prefix[2048];//, file_type[2048], file_postfix[2048];
   /* char nc_postfix[2048]; */
 
 //>>TSMP-PDAF internal change beginning (compare to AdvanceRichards)
