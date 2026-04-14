@@ -36,7 +36,8 @@
 
 #include <string.h>
 
-amps_ThreadLocalDcl(PFModule *, Solver_module);
+extern PFModule *Solver_module;  /* defined in solver.c */
+/* amps_ThreadLocalDcl(PFModule *, Solver_module); */
 amps_ThreadLocalDcl(PFModule *, solver);
 amps_ThreadLocalDcl(Vector   *, evap_trans);
 
