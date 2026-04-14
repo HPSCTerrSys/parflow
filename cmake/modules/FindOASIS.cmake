@@ -22,5 +22,6 @@ if(OASIS_FOUND AND NOT TARGET OASIS3MCT::OASIS3MCT)
   target_link_libraries(OASIS3MCT::OASIS3MCT INTERFACE ${OASIS_Fortran_LIBRARY} ${MCT_Fortran_LIBRARY} ${MPEU_Fortran_LIBRARY} ${SCRIP_Fortran_LIBRARY})
   target_link_libraries(OASIS3MCT::OASIS3MCT INTERFACE OpenMP::OpenMP_Fortran)
   target_link_libraries(OASIS3MCT::OASIS3MCT INTERFACE ${NETCDF_Fortran_LIBRARY})
+  target_include_directories(OASIS3MCT::OASIS3MCT INTERFACE ${NETCDF_Fortran_INCLUDES})
 endif()
 
