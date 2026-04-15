@@ -10,7 +10,7 @@ set (SRC_FILES_CONST advect.F
   communication.c
   computation.c
   compute_maximums.c
-  compute_top.c
+  compute_top_and_bottom.c
   compute_patch_top.c
   compute_total_concentration.c
   constantRF.c
@@ -53,6 +53,7 @@ set (SRC_FILES_CONST advect.F
   permeability_face.c
   perturb_lb.c
   pf_hypre.c
+  pf_n_vector.c
   pf_pfmg.c
   pf_pfmg_octree.c
   pf_smg.c
@@ -124,6 +125,7 @@ set (SRC_FILES_CONST advect.F
   write_clm_netcdf.c
   write_parflow_binary.c
   write_parflow_netcdf.c
+  write_parflow_pdi.c
   write_parflow_silo.c
   write_parflow_silo_pmpio.c
 )
@@ -154,6 +156,7 @@ if( (${PARFLOW_HAVE_CUDA}) OR (${PARFLOW_HAVE_KOKKOS}) OR (${PARFLOW_HAVE_OMP}) 
     problem_saturation.cpp
     rb_GS_point.cpp
     richards_jacobian_eval.cpp
+    seepage.cpp
     vector.cpp
     vector_utilities.cpp
   )
@@ -203,8 +206,12 @@ endif(${PARFLOW_HAVE_KOKKOS})
   add_library(pfsimulator ${SRC_FILES_ARCH} ${SRC_FILES_CONST})
 
   if ( ${PARFLOW_HAVE_CUDA} )
-    target_link_libraries(pfsimulator nvToolsExt)
-    target_include_directories(pfsimulator PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+    if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL 13.0 AND TARGET CUDA::nvtx3)
+      target_link_libraries(pfsimulator CUDA::nvtx3)
+    else()
+      target_link_libraries(pfsimulator nvToolsExt)
+      target_include_directories(pfsimulator PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+    endif()
   endif ( ${PARFLOW_HAVE_CUDA} )
 
   if( ${PARFLOW_HAVE_KOKKOS} )
@@ -252,6 +259,7 @@ else( (${PARFLOW_HAVE_CUDA}) OR (${PARFLOW_HAVE_KOKKOS}) OR (${PARFLOW_HAVE_OMP}
     rb_GS_point.c
     region.c
     richards_jacobian_eval.c
+    seepage.c
     vector.c
     vector_utilities.c
   )
@@ -264,7 +272,14 @@ if( ${PARFLOW_BUILD_WITH_CPP} )
     PROPERTIES LANGUAGE CXX)
 endif()
 
-target_link_libraries(pfsimulator pfkinsol amps cjson ${PARFLOW_ETRACE_LIBRARY})
+if (${PARFLOW_HAVE_SUNDIALS})
+  target_include_directories (pfsimulator PUBLIC ${SUNDIALS_INCLUDE_DIR})
+  target_link_libraries (pfsimulator ${SUNDIALS_LIBRARIES})
+else ()
+  target_link_libraries(pfsimulator pfkinsol)
+endif (${PARFLOW_HAVE_SUNDIALS})
+
+target_link_libraries(pfsimulator amps cjson ${PARFLOW_ETRACE_LIBRARY})
 target_include_directories(pfsimulator PUBLIC "../third_party/cjson")
 
 if (${PARFLOW_HAVE_MPI})
@@ -299,6 +314,11 @@ if (${PARFLOW_HAVE_SILO})
   target_include_directories (pfsimulator PUBLIC "${SILO_INCLUDE_DIRS}")
   target_link_libraries (pfsimulator ${SILO_LIBRARIES})
 endif (${PARFLOW_HAVE_SILO})
+
+if (${PARFLOW_HAVE_PDI})
+  target_include_directories (pfsimulator PUBLIC "${PDI_INCLUDE_DIRS}")
+  target_include_directories (pfsimulator PUBLIC "${PARACONF_INCLUDE_DIRS}")
+endif (${PARFLOW_HAVE_PDI})
 
 if (${PARFLOW_HAVE_NETCDF})
   target_link_libraries (pfsimulator NetCDF::NetCDF)

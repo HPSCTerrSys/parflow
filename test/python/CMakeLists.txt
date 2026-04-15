@@ -39,8 +39,12 @@ if(${PARFLOW_HAVE_HYPRE})
     smg
     pfmg_octree
     van-genuchten-file
+    overland_flux
     overland_slopingslab_KWE
     overland_tiltedV_KWE
+    overland_tiltedV_KWE_top_patch
+    overland_tiltedV_KWE_top_patch_2
+    overland_tiltedV_KWE_top_patch_3
     overland_slopingslab_DWE
     overland_tiltedV_DWE
     overland_FlatICP
@@ -68,6 +72,9 @@ if(${PARFLOW_HAVE_SILO})
 endif()
 
 if(${PARFLOW_HAVE_NETCDF})
+  list(APPEND TESTS
+      indicator_field_netcdf
+    )
   if(${PARFLOW_HAVE_HYPRE})
     #This test is failing on several platforms
     list(APPEND TESTS
@@ -95,7 +102,7 @@ if ( ${PARFLOW_AMPS_LAYER} IN_LIST PARFLOW_AMPS_LAYER_REQUIRE_MPI )
   list(APPEND PARALLEL_3DTOPO_TESTS
     default_single
     default_single_read_porosity
-    )
+  )
 
   if(${PARFLOW_HAVE_HYPRE})
     list(APPEND PARALLEL_3DTOPO_TESTS
@@ -104,7 +111,7 @@ if ( ${PARFLOW_AMPS_LAYER} IN_LIST PARFLOW_AMPS_LAYER_REQUIRE_MPI )
 
     if(${PARFLOW_HAVE_NETCDF})
       list(APPEND PARALLEL_3DTOPO_TESTS
-	default_richards_restart_netcdf)
+	      default_richards_restart_netcdf)
     endif()
 
     list(APPEND PARALLEL_2DTOPO_TESTS
@@ -115,16 +122,25 @@ if ( ${PARFLOW_AMPS_LAYER} IN_LIST PARFLOW_AMPS_LAYER_REQUIRE_MPI )
       LW_var_dz_spinup
       overland_slopingslab_KWE
       richards_box_proctest_vardz
-            reservoir_mpi_test
+      reservoir_mpi_test
     )
 
     if(${PARFLOW_HAVE_SILO})
       list(APPEND PARALLEL_2DTOPO_TESTS
-	default_overland.pfmg_octree.jac)
+	      default_overland.pfmg_octree.jac)
     endif()
   endif()
 
 endif()
+
+if(${PARFLOW_HAVE_OAS3})
+  # Exclude tests that use Richards solver
+  set(TESTS "")
+  set(PARALLEL_3DTOPO_TESTS "")
+  set(PARALLEL_2DTOPO_TESTS "")
+  list(APPEND TESTS default_single)
+endif()
+
 
 foreach(inputfile ${TESTS})
   pf_add_py_test(${inputfile})

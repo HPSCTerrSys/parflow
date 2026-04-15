@@ -81,6 +81,7 @@ typedef struct {
   int print_mannings;           /* print mannings? */
   int print_specific_storage;   /* print spec storage? */
   int print_top;                /* print top? */
+  int print_bottom;             /* print bottom? */
   int print_velocities;         /* print velocities? */
   int print_satur;              /* print saturations? */
   int print_mask;               /* print mask? */
@@ -92,6 +93,29 @@ typedef struct {
   int print_evaptrans_sum;      /* print evaptrans_sum? */
   int print_overland_sum;       /* print overland_sum? */
   int print_overland_bc_flux;   /* print overland outflow boundary condition flux? */
+  int print_qx_overland;        /* print q_overlnd_x? */
+  int print_qy_overland;        /* print q_overlnd_y? */
+
+  int write_pdi_subsurf_data;     /* write subsurf via PDI */
+  int write_pdi_press;            /* write pressure via PDI */
+  int write_pdi_slopes;           /* write slopes via PDI */
+  int write_pdi_mannings;         /* write mannings via PDI */
+  int write_pdi_specific_storage; /* write specific storage via PDI */
+  int write_pdi_top;              /* write top via PDI */
+  int write_pdi_bottom;           /* write bottom via PDI */
+  int write_pdi_velocities;       /* write velocities via PDI */
+  int write_pdi_satur;            /* write saturation via PDI */
+  int write_pdi_mask;             /* write mask via PDI */
+  //int write_pdi_concen;         /* write concentration via PDI */
+  //int write_pdi_wells;          /* write wells via PDI */
+  int write_pdi_dzmult;           /* write dzmult via PDI */
+  int write_pdi_evaptrans;        /* write evaptrans via PDI */
+  int write_pdi_evaptrans_sum;    /* write evaptrans_sum via PDI */
+  int write_pdi_overland_sum;     /* write overland_sum via PDI */
+  int write_pdi_overland_bc_flux; /* write overland_bc_flux via PDI */
+  int write_pdi_qx_overland;      /* write q_overlnd_x via PDI */
+  int write_pdi_qy_overland;      /* write q_overlnd_y via PDI */
+
   int write_silo_subsurf_data;  /* write permeability/porosity? */
   int write_silo_press;         /* write pressures? */
   int write_silo_velocities;    /* write velocities? */
@@ -104,8 +128,11 @@ typedef struct {
   int write_silo_mannings;      /* write mannings? */
   int write_silo_specific_storage;      /* write specific storage? */
   int write_silo_top;           /* write top? */
+  int write_silo_bottom;           /* write bottom? */
   int write_silo_overland_sum;  /* write sum of overland outflow? */
   int write_silo_overland_bc_flux;      /* write overland outflow boundary condition flux? */
+  int write_silo_qx_overland;   /* write q_overlnd_x? */
+  int write_silo_qy_overland;   /* write q_overlnd_y? */
   int write_silo_dzmult;        /* write dz multiplier */
   int write_silopmpio_subsurf_data;     /* write permeability/porosity as PMPIO? */
   int write_silopmpio_press;    /* write pressures as PMPIO? */
@@ -133,6 +160,7 @@ typedef struct {
   int surface_predictor;  /* key to turn on surface predictor feature RMM */
   double surface_predictor_pressure;  /* surface predictor pressure value RMM */
   int surface_predictor_print;  /* key to turn on surface predictor printing RMM */
+  int surface_lateral_flows;          /* enable surface lateral flow prediction */
 
 
 #ifdef HAVE_CLM                 /* VARIABLES FOR CLM ONLY */
@@ -169,6 +197,62 @@ typedef struct {
   double clm_irr_threshold;     /* CLM irrigation schedule -- soil moisture threshold for deficit cycle */
   int clm_irr_thresholdtype;    /* Deficit-based saturation criteria (top, bottom, column avg) */
 
+  /* Snow parameterization options @RMM 2025 */
+  int clm_snow_partition;       /* CLM snow partition type: 0=CLM, 1=wetbulb thresh, 2=wetbulb linear, 3=Dai, 4=Jennings */
+  double clm_tw_threshold;      /* CLM wetbulb temperature threshold for snow [K] */
+  double clm_thin_snow_damping; /* CLM thin snow energy damping factor [0-1] */
+  double clm_thin_snow_threshold; /* CLM SWE threshold for damping [kg/m2] */
+  double clm_snow_tcrit;        /* Initial T classification threshold above tfrz [K], default 2.5 */
+  double clm_snow_t_low;        /* CLM method lower T threshold [K], default 273.16 */
+  double clm_snow_t_high;       /* CLM method upper T threshold [K], default 275.16 */
+  double clm_snow_transition_width; /* WetbulbLinear half-width [K], default 1.0 */
+  double clm_dai_a;             /* Dai (2008) coefficient a, default -48.2292 */
+  double clm_dai_b;             /* Dai (2008) coefficient b, default 0.7205 */
+  double clm_dai_c;             /* Dai (2008) coefficient c, default 1.1662 */
+  double clm_dai_d;             /* Dai (2008) coefficient d, default 1.0223 */
+  double clm_jennings_a;        /* Jennings (2018) intercept, default -10.04 */
+  double clm_jennings_b;        /* Jennings (2018) T coefficient, default 1.41 */
+  double clm_jennings_g;        /* Jennings (2018) RH coefficient, default 0.09 */
+
+  /* SZA-based snow damping parameters @RMM 2025 */
+  double clm_sza_snow_damping;      /* SZA damping factor [0-1], 1.0=disabled */
+  double clm_sza_damping_coszen_ref; /* Reference coszen for damping onset (0.5 = 60 deg) */
+  double clm_sza_damping_coszen_min; /* Coszen at maximum damping (0.1 = 84 deg) */
+
+  /* Snow albedo parameterization options @RMM 2025 */
+  int clm_albedo_scheme;        /* CLM albedo scheme: 0=CLM, 1=VIC, 2=Tarboton */
+  double clm_albedo_vis_new;    /* Fresh snow VIS albedo [0-1] */
+  double clm_albedo_nir_new;    /* Fresh snow NIR albedo [0-1] */
+  double clm_albedo_min;        /* Minimum albedo floor [0-1] */
+  double clm_albedo_decay_vis;  /* VIS decay coefficient [0-1] */
+  double clm_albedo_decay_nir;  /* NIR decay coefficient [0-1] */
+  double clm_albedo_accum_a;    /* VIC cold-phase decay base */
+  double clm_albedo_thaw_a;     /* VIC melt-phase decay base */
+
+  /* Fractional snow covered area (frac_sno) options @RMM 2025 */
+  int clm_frac_sno_type;            /* frac_sno scheme: 0=CLM (default), 1=SZA-modulated */
+  double clm_frac_sno_roughness;    /* roughness length for frac_sno [m], default=0.01 (case 0) */
+  double clm_frac_sno_roughness_min; /* min roughness for SZA interp [m], default=1e-8 (case 1) */
+  double clm_frac_sno_roughness_max; /* max roughness for SZA interp [m], default=0.2 (case 1) */
+  double clm_frac_sno_gamma_sza;    /* SZA power-law exponent [-], default=4.0 (case 1) */
+  double clm_frac_sno_tau_sza;      /* EMA smoothing window [hours], default 72.0 */
+
+  /* Snow age parameterization - VIS/NIR separation @RMM 2025 */
+  double clm_snowage_tau0_vis;        /* VIS e-folding time [s] */
+  double clm_snowage_tau0_nir;        /* NIR e-folding time [s] */
+  double clm_snowage_grain_growth_vis; /* VIS grain growth factor [K] */
+  double clm_snowage_grain_growth_nir; /* NIR grain growth factor [K] */
+  double clm_snowage_dirt_soot_vis;   /* VIS dirt/soot factor [-] */
+  double clm_snowage_dirt_soot_nir;   /* NIR dirt/soot factor [-] */
+  double clm_snowage_reset_factor;    /* fresh snow reset factor [-] */
+
+  /* ET formulation improvements @RMM 2026 */
+  double clm_interception_fpi_max; /* Max interception fraction coefficient [-] */
+  double clm_fwet_exponent;        /* Power-law exponent for wet canopy fraction [-] */
+  int clm_stomata_scheme;          /* Stomatal model: 0=BallBerry, 1=Medlyn */
+  int clm_interception_scheme;     /* Interception scheme: 0=CLM3, 1=CLM5Tanh */
+  double clm_interception_tanh_alpha; /* CLM5 tanh scaling coefficient [-] */
+
   int clm_reuse_count;          /* NBE: Number of times to use each CLM input */
   int clm_write_logs;           /* NBE: Write the processor logs for CLM or not */
   int clm_last_rst;             /* NBE: Only write/overwrite one rst file or write a lot of them */
@@ -192,6 +276,8 @@ typedef struct {
   int write_netcdf_evaptrans_sum;       /* write evaptrans_sum? */
   int write_netcdf_overland_sum;        /* write overland_sum? */
   int write_netcdf_overland_bc_flux;    /* write overland_bc_flux? */
+  int write_netcdf_qx_overland;        /* write q_overlnd_x? */
+  int write_netcdf_qy_overland;        /* write q_overlnd_y? */
   int write_netcdf_mask;        /* write mask? */
   int write_netcdf_mannings;    /* write mask? */
   int write_netcdf_subsurface;  /* write subsurface? */
@@ -252,6 +338,8 @@ typedef struct {
   Vector *x_velocity;           /* vector containing x-velocity face values */
   Vector *y_velocity;           /* vector containing y-velocity face values */
   Vector *z_velocity;           /* vector containing z-velocity face values */
+  Vector *q_overlnd_x;          /* 2D vector containing surface flow in x-direction */
+  Vector *q_overlnd_y;          /* 2D vector containing surface flow in y-direction */
 #ifdef HAVE_CLM
   /* RM: vars for pf printing of clm output */
   Vector *eflx_lh_tot;          /* total LH flux from canopy height to atmosphere [W/m^2] */
@@ -461,7 +549,7 @@ SetupRichards(PFModule * this_module)
 
   /* Do turning bands (and other stuff maybe) */
   PFModuleInvokeType(SetProblemDataInvoke, set_problem_data, (problem_data));
-  ComputeTop(problem, problem_data);
+  ComputeTopAndBottom(problem, problem_data);
 
   if (public_xtra->print_top || public_xtra->write_silo_top)
   {
@@ -538,6 +626,30 @@ SetupRichards(PFModule * this_module)
                            storage_filenames);
   }
 
+  /* Write subsurface data */
+  if (public_xtra->write_pdi_subsurf_data)
+  {
+    strcpy(file_postfix, "perm_x");
+    WritePDI(file_prefix, file_postfix, 0,
+             ProblemDataPermeabilityX(problem_data), 0, 0);
+
+    strcpy(file_postfix, "perm_y");
+    WritePDI(file_prefix, file_postfix, 0,
+             ProblemDataPermeabilityY(problem_data), 0, 0);
+
+    strcpy(file_postfix, "perm_z");
+    WritePDI(file_prefix, file_postfix, 0,
+             ProblemDataPermeabilityZ(problem_data), 0, 0);
+
+    strcpy(file_postfix, "porosity");
+    WritePDI(file_prefix, file_postfix, 0,
+             ProblemDataPorosity(problem_data), 0, 0);
+
+    // IMF -- added specific storage to subsurface bundle
+    strcpy(file_postfix, "specific_storage");
+    WritePDI(file_prefix, file_postfix, 0,
+             ProblemDataSpecificStorage(problem_data), 0, 0);
+  }
 
   if (public_xtra->write_silo_subsurf_data)
   {
@@ -617,6 +729,17 @@ SetupRichards(PFModule * this_module)
                            slope_filenames);
   }
 
+  if (public_xtra->write_pdi_slopes)
+  {
+    strcpy(file_postfix, "slope_x");
+    WritePDI(file_prefix, file_postfix, 0,
+             ProblemDataTSlopeX(problem_data), 0, 0);
+
+    strcpy(file_postfix, "slope_y");
+    WritePDI(file_prefix, file_postfix, 0,
+             ProblemDataTSlopeY(problem_data), 0, 0);
+  }
+
   if (public_xtra->print_channelwidth)
   {
     strcpy(file_postfix, "wc_x");
@@ -676,6 +799,13 @@ SetupRichards(PFModule * this_module)
                            mannings_filenames);
   }
 
+  if (public_xtra->write_pdi_mannings)
+  {
+    strcpy(file_postfix, "mannings");
+    WritePDI(file_prefix, file_postfix, 0,
+             ProblemDataMannings(problem_data), 0, 0);
+  }
+
   if (public_xtra->write_silo_mannings)
   {
     strcpy(file_postfix, "");
@@ -704,6 +834,12 @@ SetupRichards(PFModule * this_module)
                            js_inputs, file_prefix, "dz multiplier", NULL, "cell", "subsurface",
                            sizeof(dzmult_filenames) / sizeof(dzmult_filenames[0]),
                            dzmult_filenames);
+  }
+
+  if (public_xtra->write_pdi_dzmult)
+  {
+    strcpy(file_postfix, "dz_mult");
+    WritePDI(file_prefix, file_postfix, 0, instance_xtra->dz_mult, 0, 0);
   }
 
   if (public_xtra->write_silo_dzmult)
@@ -744,6 +880,16 @@ SetupRichards(PFModule * this_module)
     }
   }
 
+  // IMF --
+  // Lumped specific storage w/ subsurf bundle,
+  // Left keys for individual printing for backward compatibility
+  if (public_xtra->write_pdi_specific_storage)
+  {
+    strcpy(file_postfix, "specific_storage");
+    WritePDI(file_prefix, file_postfix, 0,
+             ProblemDataSpecificStorage(problem_data), 0, 0);
+  }
+
   if (public_xtra->write_silo_specific_storage)
   {
     strcpy(file_postfix, "");
@@ -761,6 +907,22 @@ SetupRichards(PFModule * this_module)
     WritePFBinary(file_prefix, file_postfix, ProblemDataPatchIndexOfDomainTop(problem_data));
   }
 
+  if (public_xtra->print_bottom)
+  {
+    strcpy(file_postfix, "bottom_zindex");
+    WritePFBinary(file_prefix, file_postfix, ProblemDataIndexOfDomainBottom(problem_data));
+  }
+
+  if (public_xtra->write_pdi_top)
+  {
+    printf("WritePDITop -- not yet implemented\n");
+  }
+
+  if (public_xtra->write_pdi_bottom)
+  {
+    printf("WritePDIBottom -- not yet implemented\n");
+  }
+
   if (public_xtra->write_silo_top)
   {
     strcpy(file_postfix, "");
@@ -770,6 +932,14 @@ SetupRichards(PFModule * this_module)
     strcpy(file_type, "top_patch");
     WriteSilo(file_prefix, file_type, file_postfix, ProblemDataPatchIndexOfDomainTop(problem_data),
               t, 0, "TopPatch");
+  }
+
+  if (public_xtra->write_silo_bottom)
+  {
+    strcpy(file_postfix, "");
+    strcpy(file_type, "bottom_zindex");
+    WriteSilo(file_prefix, file_type, file_postfix, ProblemDataIndexOfDomainBottom(problem_data),
+              t, 0, "BottomZIndex");
   }
 
   if (!amps_Rank(amps_CommWorld))
@@ -845,6 +1015,7 @@ SetupRichards(PFModule * this_module)
 
     if (public_xtra->write_silo_overland_sum
         || public_xtra->print_overland_sum
+        || public_xtra->write_pdi_overland_sum
         || public_xtra->write_silopmpio_overland_sum
         || public_xtra->write_netcdf_overland_sum)
     {
@@ -872,6 +1043,38 @@ SetupRichards(PFModule * this_module)
     instance_xtra->z_velocity =
       NewVectorType(z_grid, 1, 2, vector_side_centered_z);
     InitVectorAll(instance_xtra->z_velocity, 0.0);
+
+    /* initialize 2D surface flow vectors */
+
+    if (public_xtra->write_silo_qx_overland
+        || public_xtra->print_qx_overland
+        || public_xtra->write_pdi_qx_overland
+        || public_xtra->write_netcdf_qx_overland
+        || public_xtra->surface_predictor)
+    {
+      instance_xtra->q_overlnd_x =
+        NewVectorType(grid2d, 1, 1, vector_cell_centered_2D);
+      InitVectorAll(instance_xtra->q_overlnd_x, 0.0);
+    }
+    else
+    {
+      instance_xtra->q_overlnd_x = NULL;
+    }
+
+    if (public_xtra->write_silo_qy_overland
+        || public_xtra->print_qy_overland
+        || public_xtra->write_pdi_qy_overland
+        || public_xtra->write_netcdf_qy_overland
+        || public_xtra->surface_predictor)
+    {
+      instance_xtra->q_overlnd_y =
+        NewVectorType(grid2d, 1, 1, vector_cell_centered_2D);
+      InitVectorAll(instance_xtra->q_overlnd_y, 0.0);
+    }
+    else
+    {
+      instance_xtra->q_overlnd_y = NULL;
+    }
 
     /*sk Initialize LSM terms */
     instance_xtra->evap_trans = NewVectorType(grid, 1, 1, vector_cell_centered);
@@ -1299,6 +1502,13 @@ SetupRichards(PFModule * this_module)
                                 press_filenames);
       }
 
+      if (public_xtra->write_pdi_press)
+      {
+        sprintf(file_postfix, "press.%05d", instance_xtra->file_number);
+        WritePDI(file_prefix, file_postfix, instance_xtra->file_number, instance_xtra->pressure, 0, 0);
+        any_file_dumped = 1;
+      }
+
       if (public_xtra->write_silo_press)
       {
         sprintf(file_postfix, "%05d", instance_xtra->file_number);
@@ -1345,6 +1555,14 @@ SetupRichards(PFModule * this_module)
                                 js_outputs, file_prefix, t, 0, "saturation", NULL, "cell", "subsurface",
                                 sizeof(satur_filenames) / sizeof(satur_filenames[0]),
                                 satur_filenames);
+      }
+
+      if (public_xtra->write_pdi_satur)
+      {
+        sprintf(file_postfix, "satur.%05d", instance_xtra->file_number);
+        WritePDI(file_prefix, file_postfix, instance_xtra->file_number,
+                 instance_xtra->saturation, 0, 0);
+        any_file_dumped = 1;
       }
 
       if (public_xtra->write_silo_satur)
@@ -1573,6 +1791,23 @@ SetupRichards(PFModule * this_module)
       }
     }
 
+    if (public_xtra->write_pdi_velocities)
+    {
+      sprintf(file_postfix, "velx.%05d", instance_xtra->file_number);
+      WritePDI(file_prefix, file_postfix, instance_xtra->file_number,
+               instance_xtra->x_velocity, 0, 0);
+
+      sprintf(file_postfix, "vely.%05d", instance_xtra->file_number);
+      WritePDI(file_prefix, file_postfix, instance_xtra->file_number,
+               instance_xtra->y_velocity, 0, 0);
+
+      sprintf(file_postfix, "velz.%05d", instance_xtra->file_number);
+      WritePDI(file_prefix, file_postfix, instance_xtra->file_number,
+               instance_xtra->z_velocity, 0, 0);
+
+      any_file_dumped = 1;
+    }
+
     /*-----------------------------------------------------------------
      * Print out mask?
      *-----------------------------------------------------------------*/
@@ -1716,8 +1951,8 @@ int           istep = 1;
 #ifdef HAVE_CLM
   Grid *grid = (instance_xtra->grid);
   Subgrid *subgrid;
-  Subvector *p_sub, *s_sub, *et_sub, *m_sub, *po_sub, *dz_sub;
-  double *pp, *sp, *et, *ms, *po_dat, *dz_dat;
+  Subvector *p_sub, *s_sub, *et_sub, *po_sub, *dz_sub;
+  double *pp, *sp, *et, *po_dat, *dz_dat;
 
   /* IMF: For CLM met forcing (local to AdvanceRichards) */
   int istep;                    // IMF: counter for clm output times
@@ -2369,11 +2604,19 @@ int           istep = 1;
         int soi_z;
         int x, y, z;
 
+        Vector *top = ProblemDataIndexOfDomainTop(problem_data);
+        Vector *bot = ProblemDataIndexOfDomainBottom(problem_data);
+        Subvector *top_sub;
+        Subvector *bot_sub;
+        double *top_dat;
+        double *bot_dat;
+
         subgrid = GridSubgrid(grid, is);
         p_sub = VectorSubvector(instance_xtra->pressure, is);
         s_sub = VectorSubvector(instance_xtra->saturation, is);
         et_sub = VectorSubvector(evap_trans, is);
-        m_sub = VectorSubvector(instance_xtra->mask, is);
+        top_sub = VectorSubvector(top, is);
+        bot_sub = VectorSubvector(bot, is);
         po_sub = VectorSubvector(porosity, is);
         dz_sub = VectorSubvector(instance_xtra->dz_mult, is);
 
@@ -2450,7 +2693,8 @@ int           istep = 1;
         sp = SubvectorData(s_sub);
         pp = SubvectorData(p_sub);
         et = SubvectorData(et_sub);
-        ms = SubvectorData(m_sub);
+        top_dat = SubvectorData(top_sub);
+        bot_dat = SubvectorData(bot_sub);
         po_dat = SubvectorData(po_sub);
         dz_dat = SubvectorData(dz_sub);
 
@@ -2580,8 +2824,8 @@ int           istep = 1;
           {
             /*BH: added vegetation forcings and associated option (clm_forc_veg) */
             clm_file_dir_length = strlen(public_xtra->clm_file_dir);
-            CALL_CLM_LSM(pp, sp, et, ms, po_dat, dz_dat, istep, cdt, t,
-                         start_time, dx, dy, dz, ix, iy, nx, ny, nz,
+            CALL_CLM_LSM(pp, sp, et, top_dat, bot_dat, po_dat, dz_dat, istep,
+                         cdt, t, start_time, dx, dy, dz, ix, iy, nx, ny, nz,
                          nx_f, ny_f, nz_f, nz_rz, ip, p, q, r, gnx,
                          gny, rank, sw_data, lw_data, prcp_data,
                          tas_data, u_data, v_data, patm_data,
@@ -2615,7 +2859,51 @@ int           istep = 1;
                          clm_daily_rst,
                          clm_water_stress_type,
                          public_xtra->clm_nz,
-                         public_xtra->clm_nz);
+                         public_xtra->clm_nz,
+                         public_xtra->clm_snow_partition,
+                         public_xtra->clm_tw_threshold,
+                         public_xtra->clm_thin_snow_damping,
+                         public_xtra->clm_thin_snow_threshold,
+                         public_xtra->clm_snow_tcrit,
+                         public_xtra->clm_snow_t_low,
+                         public_xtra->clm_snow_t_high,
+                         public_xtra->clm_snow_transition_width,
+                         public_xtra->clm_dai_a,
+                         public_xtra->clm_dai_b,
+                         public_xtra->clm_dai_c,
+                         public_xtra->clm_dai_d,
+                         public_xtra->clm_jennings_a,
+                         public_xtra->clm_jennings_b,
+                         public_xtra->clm_jennings_g,
+                         public_xtra->clm_sza_snow_damping,
+                         public_xtra->clm_sza_damping_coszen_ref,
+                         public_xtra->clm_sza_damping_coszen_min,
+                         public_xtra->clm_albedo_scheme,
+                         public_xtra->clm_albedo_vis_new,
+                         public_xtra->clm_albedo_nir_new,
+                         public_xtra->clm_albedo_min,
+                         public_xtra->clm_albedo_decay_vis,
+                         public_xtra->clm_albedo_decay_nir,
+                         public_xtra->clm_albedo_accum_a,
+                         public_xtra->clm_albedo_thaw_a,
+                         public_xtra->clm_frac_sno_type,
+                         public_xtra->clm_frac_sno_roughness,
+                         public_xtra->clm_frac_sno_roughness_min,
+                         public_xtra->clm_frac_sno_roughness_max,
+                         public_xtra->clm_frac_sno_gamma_sza,
+                         public_xtra->clm_frac_sno_tau_sza,
+                         public_xtra->clm_snowage_tau0_vis,
+                         public_xtra->clm_snowage_tau0_nir,
+                         public_xtra->clm_snowage_grain_growth_vis,
+                         public_xtra->clm_snowage_grain_growth_nir,
+                         public_xtra->clm_snowage_dirt_soot_vis,
+                         public_xtra->clm_snowage_dirt_soot_nir,
+                         public_xtra->clm_snowage_reset_factor,
+                         public_xtra->clm_interception_fpi_max,
+                         public_xtra->clm_fwet_exponent,
+                         public_xtra->clm_stomata_scheme,
+                         public_xtra->clm_interception_scheme,
+                         public_xtra->clm_interception_tanh_alpha);
 
             break;
           }
@@ -3019,9 +3307,13 @@ int           istep = 1;
         int ip;
         double dx, dy, dz;
         double vol, vol_max, flux_in, press_pred, flux_darcy;
+        double flux_surface_lateral = 0.0;
+        double flux_total = 0.0;
 
         Subvector *p_sub, *s_sub, *et_sub, *po_sub, *dz_sub, *vz_sub, *vx_sub, *vy_sub;
+        Subvector *qx_sub, *qy_sub;
         double *pp, *sp, *et, *po_dat, *dz_dat, *vz, *vx, *vy;
+        double *qx_dat, *qy_dat;
 
         Subgrid *subgrid;
         Grid *grid = VectorGrid(evap_trans_sum);
@@ -3037,6 +3329,9 @@ int           istep = 1;
           vx_sub = VectorSubvector(instance_xtra->x_velocity, is);
           vy_sub = VectorSubvector(instance_xtra->y_velocity, is);
           vz_sub = VectorSubvector(instance_xtra->z_velocity, is);
+
+          qx_sub = VectorSubvector(instance_xtra->q_overlnd_x, is);
+          qy_sub = VectorSubvector(instance_xtra->q_overlnd_y, is);
 
           r = SubgridRX(subgrid);
 
@@ -3062,6 +3357,9 @@ int           istep = 1;
           vy = SubvectorData(vy_sub);
           vz = SubvectorData(vz_sub);
 
+          qx_dat = SubvectorData(qx_sub);
+          qy_dat = SubvectorData(qy_sub);
+
 
           GrGeomInLoop(i, j, k, gr_domain, r, ix, iy, iz, nx, ny, nz,
           {
@@ -3072,20 +3370,37 @@ int           istep = 1;
             int vyi_jm1 = SubvectorEltIndex(vy_sub, i, j, k);
             int vzi_km1 = SubvectorEltIndex(vz_sub, i, j, k);
 
-            int vxi_p1 = SubvectorEltIndex(vx_sub, i + 1, j, k + 1);
-            int vyi_p1 = SubvectorEltIndex(vy_sub, i, j + 1, k + 1);
-            int vxi_im1_p1 = SubvectorEltIndex(vx_sub, i, j, k + 1);
-            int vyi_jm1_p1 = SubvectorEltIndex(vy_sub, i, j, k + 1);
-
             if (k == (nz - 1))
             {
               vol = dx * dy * dz * dz_dat[ip] * po_dat[ip] * sp[ip];
               flux_in = dx * dy * dz * dz_dat[ip] * et[ip] * dt;
               vol_max = dx * dy * dz * dz_dat[ip] * po_dat[ip];
 
+              flux_surface_lateral = 0.0;
+
               flux_darcy = vz[vzi_km1] * dx * dy * dt + (-vx[vxi] + vx[vxi_im1]) * dy * dz * dz_dat[ip] * dt + (-vy[vyi] + vy[vyi_jm1]) * dx * dz * dz_dat[ip] * dt;
-              press_pred = ((flux_in + flux_darcy) - (vol_max - vol)) / (dx * dy * po_dat[ip]);
-              if ((flux_in + flux_darcy) > (vol_max - vol))
+
+              if (public_xtra->surface_lateral_flows == 1)
+              {
+                int io_q = SubvectorEltIndex(qx_sub, i, j, 0);
+                int io_q_west = SubvectorEltIndex(qx_sub, i - 1, j, 0);
+                int io_q_south = SubvectorEltIndex(qy_sub, i, j - 1, 0);
+
+                double qx_current = qx_dat[io_q];
+                double qx_west = (i > 0) ? qx_dat[io_q_west] : 0.0;
+                double qy_current = qy_dat[io_q];
+                double qy_south = (j > 0) ? qy_dat[io_q_south] : 0.0;
+
+                flux_surface_lateral = dt * ((qx_current - qx_west) * dy + (qy_current - qy_south) * dx);
+                flux_total = flux_in + flux_darcy + flux_surface_lateral;
+              }
+              else
+              {
+                flux_total = flux_in + flux_darcy;
+              }
+
+              press_pred = (flux_total - (vol_max - vol)) / (dx * dy * po_dat[ip]);
+              if (flux_total > (vol_max - vol))
               {
                 if (pp[ip] < 0.0)
                 {
@@ -3096,9 +3411,9 @@ int           istep = 1;
 
                   if (public_xtra->surface_predictor_print == 1)
                   {
-                    amps_Printf("SP: Cell vol: %3.6e vol_max: %3.6e flux_in: %3.6e  Flux Darcy: %3.6e Cell Pressure: %3.6e Pred Pressure: %3.6e I: %d J: %d  Time: %12.4e  \n", vol, vol_max, flux_in, flux_darcy, pp[ip], press_pred, i, j, t);
-                    amps_Printf("SP: vx_r: %3.6e vx_l: %3.6e vy_r: %3.6e vy_l: %3.6e vz_l: %3.6e  I: %d J: %d k: %d \n", vx[vxi], vx[vxi_im1], vy[vyi], vy[vyi_jm1], vz[vzi_km1], i, j, k);
-                    amps_Printf("SP: vx_r: %3.6e vx_l: %3.6e vy_r: %3.6e vy_l: %3.6e    k+1 \n", vx[vxi_p1], vx[vxi_im1_p1], vy[vyi_p1], vy[vyi_jm1_p1]);
+                    amps_Printf("SP: Cell vol: %3.6e vol_max: %3.6e flux_in: %3.6e  Flux Darcy: %3.6e Flux Surface: %3.6e Flux Total: %3.6e \n", vol, vol_max, flux_in, flux_darcy, flux_surface_lateral, flux_total);
+                    amps_Printf("SP: Cell Pressure: %3.6e Pred Pressure: %3.6e I: %d J: %d  Time: %12.4e \n", pp[ip], press_pred, i, j, t);
+                    amps_Printf("SP: vx_r: %3.6e vx_l: %3.6e vy_r: %3.6e vy_l: %3.6e vz_l: %3.6e  I: %d J: %d K: %d \n", vx[vxi], vx[vxi_im1], vy[vyi], vy[vyi_jm1], vz[vzi_km1], i, j, k);
                   }
                   pp[ip] = press_pred;
                 }
@@ -3126,7 +3441,9 @@ int           istep = 1;
                                    instance_xtra->ovrl_bc_flx,
                                    instance_xtra->x_velocity,
                                    instance_xtra->y_velocity,
-                                   instance_xtra->z_velocity));
+                                   instance_xtra->z_velocity,
+                                   instance_xtra->q_overlnd_x,
+                                   instance_xtra->q_overlnd_y));
 
       if (retval != 0)
       {
@@ -3420,6 +3737,7 @@ int           istep = 1;
      **************************************************************/
     if (public_xtra->write_silo_evaptrans_sum
         || public_xtra->print_evaptrans_sum
+        || public_xtra->write_pdi_evaptrans_sum
         || public_xtra->write_netcdf_evaptrans_sum)
     {
       EvapTransSum(problem_data, dt, evap_trans_sum, evap_trans);
@@ -3430,6 +3748,7 @@ int           istep = 1;
      **************************************************************/
     if (public_xtra->write_silo_overland_sum
         || public_xtra->print_overland_sum
+        || public_xtra->write_pdi_overland_sum
         || public_xtra->write_netcdf_overland_sum)
     {
       OverlandSum(problem_data,
@@ -3473,6 +3792,15 @@ int           istep = 1;
         MetadataAddDynamicField(
                                 js_outputs, file_prefix, t, instance_xtra->file_number,
                                 "pressure", "m", "cell", "subsurface", 0, NULL);
+      }
+
+      if (public_xtra->write_pdi_press)
+      {
+        sprintf(file_postfix, "press.%05d",
+                instance_xtra->file_number);
+        WritePDI(file_prefix, file_postfix, instance_xtra->file_number,
+                 instance_xtra->pressure, 0, 0);
+        any_file_dumped = 1;
       }
 
       if (public_xtra->write_silo_press)
@@ -3534,6 +3862,21 @@ int           istep = 1;
         any_file_dumped = 1;
       }
 
+      if (public_xtra->write_pdi_velocities)        //jjb
+      {
+        sprintf(file_postfix, "velx.%05d", instance_xtra->file_number);
+        WritePDI(file_prefix, file_postfix, instance_xtra->file_number,
+                 instance_xtra->x_velocity, 0, 0);
+
+        sprintf(file_postfix, "vely.%05d", instance_xtra->file_number);
+        WritePDI(file_prefix, file_postfix, instance_xtra->file_number,
+                 instance_xtra->y_velocity, 0, 0);
+
+        sprintf(file_postfix, "velz.%05d", instance_xtra->file_number);
+        WritePDI(file_prefix, file_postfix, instance_xtra->file_number,
+                 instance_xtra->z_velocity, 0, 0);
+        any_file_dumped = 1;
+      }
 
       if (public_xtra->print_satur)
       {
@@ -3547,6 +3890,15 @@ int           istep = 1;
         MetadataAddDynamicField(
                                 js_outputs, file_prefix, t, instance_xtra->file_number,
                                 "saturation", "1/m", "cell", "subsurface", 0, NULL);
+      }
+
+      if (public_xtra->write_pdi_satur)
+      {
+        sprintf(file_postfix, "satur.%05d",
+                instance_xtra->file_number);
+        WritePDI(file_prefix, file_postfix, instance_xtra->file_number,
+                 instance_xtra->saturation, 0, 0);
+        any_file_dumped = 1;
       }
 
       if (public_xtra->write_silo_satur)
@@ -3595,6 +3947,13 @@ int           istep = 1;
          */
       }
 
+      if (public_xtra->write_pdi_evaptrans)
+      {
+        sprintf(file_postfix, "evaptrans.%05d",
+                instance_xtra->file_number);
+        WritePDI(file_prefix, file_postfix, instance_xtra->file_number, evap_trans, 0, 0);
+        any_file_dumped = 1;
+      }
 
       if (public_xtra->write_silo_evaptrans)
       {
@@ -3627,6 +3986,7 @@ int           istep = 1;
 
       if (public_xtra->print_evaptrans_sum
           || public_xtra->write_silo_evaptrans_sum
+          || public_xtra->write_pdi_evaptrans_sum
           || public_xtra->write_netcdf_evaptrans_sum)
       {
         if (public_xtra->write_netcdf_evaptrans_sum)
@@ -3643,6 +4003,14 @@ int           istep = 1;
           sprintf(file_postfix, "evaptranssum.%05d",
                   instance_xtra->file_number);
           WritePFBinary(file_prefix, file_postfix, evap_trans_sum);
+          any_file_dumped = 1;
+        }
+
+        if (public_xtra->write_pdi_evaptrans_sum)
+        {
+          sprintf(file_postfix, "evaptranssum.%05d",
+                  instance_xtra->file_number);
+          WritePDI(file_prefix, file_postfix, instance_xtra->file_number, evap_trans_sum, 0, 0);
           any_file_dumped = 1;
         }
 
@@ -3672,6 +4040,7 @@ int           istep = 1;
       }
 
       if (public_xtra->print_overland_sum
+          || public_xtra->write_pdi_overland_sum
           || public_xtra->write_silo_overland_sum
           || public_xtra->write_netcdf_overland_sum)
       {
@@ -3689,6 +4058,14 @@ int           istep = 1;
           sprintf(file_postfix, "overlandsum.%05d",
                   instance_xtra->file_number);
           WritePFBinary(file_prefix, file_postfix, overland_sum);
+          any_file_dumped = 1;
+        }
+
+        if (public_xtra->write_pdi_overland_sum)
+        {
+          sprintf(file_postfix, "overlandsum.%05d",
+                  instance_xtra->file_number);
+          WritePDI(file_prefix, file_postfix, instance_xtra->file_number, overland_sum, 0, 0);
           any_file_dumped = 1;
         }
 
@@ -3732,6 +4109,15 @@ int           istep = 1;
          */
       }
 
+      if (public_xtra->write_pdi_overland_bc_flux)
+      {
+        sprintf(file_postfix, "overland_bc_flux.%05d",
+                instance_xtra->file_number);
+        WritePDI(file_prefix, file_postfix, instance_xtra->file_number,
+                 instance_xtra->ovrl_bc_flx, 0, 0);
+        any_file_dumped = 1;
+      }
+
       if (public_xtra->write_netcdf_overland_bc_flux)
       {
         sprintf(nc_postfix, "%05d", instance_xtra->file_number);
@@ -3759,6 +4145,76 @@ int           istep = 1;
         WriteSiloPMPIO(file_prefix, file_type, file_postfix,
                        instance_xtra->ovrl_bc_flx, t,
                        instance_xtra->file_number, "OverlandBCFlux");
+        any_file_dumped = 1;
+      }
+
+      if (public_xtra->write_netcdf_qx_overland)
+      {
+        sprintf(nc_postfix, "%05d", instance_xtra->file_number);
+        WritePFNC(file_prefix, nc_postfix, t,
+                  instance_xtra->q_overlnd_x,
+                  public_xtra->numVarTimeVariant, "qx_overland",
+                  2, false, public_xtra->numVarIni);
+        any_file_dumped = 1;
+      }
+
+      if (public_xtra->write_netcdf_qy_overland)
+      {
+        sprintf(nc_postfix, "%05d", instance_xtra->file_number);
+        WritePFNC(file_prefix, nc_postfix, t,
+                  instance_xtra->q_overlnd_y,
+                  public_xtra->numVarTimeVariant, "qy_overland",
+                  2, false, public_xtra->numVarIni);
+        any_file_dumped = 1;
+      }
+
+      if (public_xtra->print_qx_overland)
+      {
+        sprintf(file_postfix, "qx_overland.%05d", instance_xtra->file_number);
+        WritePFBinary(file_prefix, file_postfix, instance_xtra->q_overlnd_x);
+        any_file_dumped = 1;
+      }
+
+      if (public_xtra->print_qy_overland)
+      {
+        sprintf(file_postfix, "qy_overland.%05d", instance_xtra->file_number);
+        WritePFBinary(file_prefix, file_postfix, instance_xtra->q_overlnd_y);
+        any_file_dumped = 1;
+      }
+
+      if (public_xtra->write_pdi_qx_overland)
+      {
+        sprintf(file_postfix, "qx_overland.%05d", instance_xtra->file_number);
+        WritePDI(file_prefix, file_postfix, instance_xtra->file_number,
+                 instance_xtra->q_overlnd_x, 0, 0);
+        any_file_dumped = 1;
+      }
+
+      if (public_xtra->write_pdi_qy_overland)
+      {
+        sprintf(file_postfix, "qy_overland.%05d", instance_xtra->file_number);
+        WritePDI(file_prefix, file_postfix, instance_xtra->file_number,
+                 instance_xtra->q_overlnd_y, 0, 0);
+        any_file_dumped = 1;
+      }
+
+      if (public_xtra->write_silo_qx_overland)
+      {
+        sprintf(file_postfix, "%05d", instance_xtra->file_number);
+        sprintf(file_type, "qx_overland");
+        WriteSilo(file_prefix, file_type, file_postfix,
+                  instance_xtra->q_overlnd_x, t,
+                  instance_xtra->file_number, "QxOverland");
+        any_file_dumped = 1;
+      }
+
+      if (public_xtra->write_silo_qy_overland)
+      {
+        sprintf(file_postfix, "%05d", instance_xtra->file_number);
+        sprintf(file_type, "qy_overland");
+        WriteSilo(file_prefix, file_type, file_postfix,
+                  instance_xtra->q_overlnd_y, t,
+                  instance_xtra->file_number, "QyOverland");
         any_file_dumped = 1;
       }
 
@@ -4301,6 +4757,14 @@ int           istep = 1;
       any_file_dumped = 1;
     }
 
+    if (public_xtra->write_pdi_satur)
+    {
+      sprintf(file_postfix, "satur.%05d", instance_xtra->file_number);
+      WritePDI(file_prefix, file_postfix, instance_xtra->file_number,
+               instance_xtra->saturation, 0, 0);
+      any_file_dumped = 1;
+    }
+
     if (public_xtra->write_silo_satur)
     {
       sprintf(file_postfix, "%05d", instance_xtra->file_number);
@@ -4319,6 +4783,14 @@ int           istep = 1;
       any_file_dumped = 1;
     }
 
+    if (public_xtra->write_pdi_evaptrans)
+    {
+      sprintf(file_postfix, "evaptrans.%05d",
+              instance_xtra->file_number);
+      WritePDI(file_prefix, file_postfix, instance_xtra->file_number, evap_trans, 0, 0);
+      any_file_dumped = 1;
+    }
+
     if (public_xtra->write_silo_evaptrans)
     {
       sprintf(file_postfix, "%05d", instance_xtra->file_number);
@@ -4329,6 +4801,7 @@ int           istep = 1;
     }
 
     if (public_xtra->print_evaptrans_sum
+        || public_xtra->write_pdi_evaptrans_sum
         || public_xtra->write_silo_evaptrans_sum)
     {
       if (public_xtra->print_evaptrans_sum)
@@ -4336,6 +4809,14 @@ int           istep = 1;
         sprintf(file_postfix, "evaptranssum.%05d",
                 instance_xtra->file_number);
         WritePFBinary(file_prefix, file_postfix, evap_trans_sum);
+        any_file_dumped = 1;
+      }
+
+      if (public_xtra->write_pdi_evaptrans_sum)
+      {
+        sprintf(file_postfix, "evaptranssum.%05d",
+                instance_xtra->file_number);
+        WritePDI(file_prefix, file_postfix, instance_xtra->file_number, evap_trans_sum, 0, 0);
         any_file_dumped = 1;
       }
 
@@ -4353,6 +4834,7 @@ int           istep = 1;
     }
 
     if (public_xtra->print_overland_sum
+        || public_xtra->write_pdi_overland_sum
         || public_xtra->write_silo_overland_sum)
     {
       if (public_xtra->print_overland_sum)
@@ -4360,6 +4842,14 @@ int           istep = 1;
         sprintf(file_postfix, "overlandsum.%05d",
                 instance_xtra->file_number);
         WritePFBinary(file_prefix, file_postfix, overland_sum);
+        any_file_dumped = 1;
+      }
+
+      if (public_xtra->write_pdi_overland_sum)
+      {
+        sprintf(file_postfix, "overlandsum.%05d",
+                instance_xtra->file_number);
+        WritePDI(file_prefix, file_postfix, instance_xtra->file_number, overland_sum, 0, 0);
         any_file_dumped = 1;
       }
 
@@ -4382,6 +4872,15 @@ int           istep = 1;
               instance_xtra->file_number);
       WritePFBinary(file_prefix, file_postfix,
                     instance_xtra->ovrl_bc_flx);
+      any_file_dumped = 1;
+    }
+
+    if (public_xtra->write_pdi_overland_bc_flux)
+    {
+      sprintf(file_postfix, "overland_bc_flux.%05d",
+              instance_xtra->file_number);
+      WritePDI(file_prefix, file_postfix, instance_xtra->file_number,
+               instance_xtra->ovrl_bc_flx, 0, 0);
       any_file_dumped = 1;
     }
 
@@ -4429,29 +4928,29 @@ PseudoAdvanceRichards(PFModule * this_module, double start_time,      /* Startin
   printf("Pseudo richard for OAS init\n");
   //>>TSMP-PDAF internal change end
 
-  PublicXtra *public_xtra = (PublicXtra*)PFModulePublicXtra(this_module);
+  /* PublicXtra *public_xtra = (PublicXtra*)PFModulePublicXtra(this_module); */
   InstanceXtra *instance_xtra =
     (InstanceXtra*)PFModuleInstanceXtra(this_module);
-  Problem *problem = (public_xtra->problem);
+  /* Problem *problem = (public_xtra->problem); */
 
-  int max_iterations = (public_xtra->max_iterations);
-  int print_satur = (public_xtra->print_satur);
-  int print_wells = (public_xtra->print_wells);
+  /* int max_iterations = (public_xtra->max_iterations); */
+  /* int print_satur = (public_xtra->print_satur); */
+  /* int print_wells = (public_xtra->print_wells); */
 
-  PFModule *problem_saturation = (instance_xtra->problem_saturation);
-  PFModule *phase_density = (instance_xtra->phase_density);
-  PFModule *select_time_step = (instance_xtra->select_time_step);
-  PFModule *l2_error_norm = (instance_xtra->l2_error_norm);
-  PFModule *nonlin_solver = (instance_xtra->nonlin_solver);
+  /* PFModule *problem_saturation = (instance_xtra->problem_saturation); */
+  /* PFModule *phase_density = (instance_xtra->phase_density); */
+  /* PFModule *select_time_step = (instance_xtra->select_time_step); */
+  /* PFModule *l2_error_norm = (instance_xtra->l2_error_norm); */
+  /* PFModule *nonlin_solver = (instance_xtra->nonlin_solver); */
 
-  ProblemData *problem_data = (instance_xtra->problem_data);
+  /* ProblemData *problem_data = (instance_xtra->problem_data); */
 
-  int start_count = ProblemStartCount(problem);
-  double dump_interval = ProblemDumpInterval(problem);
+  /* int start_count = ProblemStartCount(problem); */
+  /* double dump_interval = ProblemDumpInterval(problem); */
 
-  Vector *porosity = ProblemDataPorosity(problem_data);
-  Vector *evap_trans_sum = instance_xtra->evap_trans_sum;
-  Vector *overland_sum = instance_xtra->overland_sum;   /* sk: Vector of outflow at the boundary */
+  /* Vector *porosity = ProblemDataPorosity(problem_data); */
+  /* Vector *evap_trans_sum = instance_xtra->evap_trans_sum; */
+  /* Vector *overland_sum = instance_xtra->overland_sum;   /\* sk: Vector of outflow at the boundary *\/ */
 
   if (evap_trans == NULL)
   {
@@ -4461,8 +4960,8 @@ PseudoAdvanceRichards(PFModule * this_module, double start_time,      /* Startin
 #ifdef HAVE_OAS3
   Grid *grid = (instance_xtra->grid);
   Subgrid *subgrid;
-  Subvector *p_sub, *s_sub, *et_sub, *m_sub, *po_sub, *dz_sub;
-  double *pp, *sp, *et, *ms, *po_dat, *dz_dat;
+  /* Subvector *p_sub, *s_sub, *et_sub, *m_sub, *po_sub, *dz_sub; */
+  /* double *pp, *sp, *et, *ms, *po_dat, *dz_dat; */
   double sw_lat = .0;
   double sw_lon = .0;
 #endif
@@ -4525,29 +5024,29 @@ PseudoAdvanceRichards(PFModule * this_module, double start_time,      /* Startin
 // #endif
 //>>TSMP-PDAF internal change end
 
-  int any_file_dumped;
-  int clm_file_dumped;
-  int dump_files = 0;
+  /* int any_file_dumped; */
+  /* int clm_file_dumped; */
+  /* int dump_files = 0; */
 
-  int retval;
-  int converged;
-  int take_more_time_steps;
-  int conv_failures;
-  int max_failures = public_xtra->max_convergence_failures;
+  /* int retval; */
+  /* int converged; */
+  /* int take_more_time_steps; */
+  /* int conv_failures; */
+  /* int max_failures = public_xtra->max_convergence_failures; */
 
-  double t;
-  double dt = 0.0;
-  double ct = 0.0;
-  double cdt = 0.0;
-  double print_dt;
-  double dtmp, err_norm;
-  double gravity = ProblemGravity(problem);
+  /* double t; */
+  /* double dt = 0.0; */
+  /* double ct = 0.0; */
+  /* double cdt = 0.0; */
+  /* double print_dt; */
+  /* double dtmp, err_norm; */
+  /* double gravity = ProblemGravity(problem); */
 
-  VectorUpdateCommHandle *handle;
+  /* VectorUpdateCommHandle *handle; */
 
-  char dt_info;
-  char file_prefix[2048], file_type[2048], file_postfix[2048];
-  char nc_postfix[2048];
+  /* char dt_info; */
+  char file_prefix[2048];//, file_type[2048], file_postfix[2048];
+  /* char nc_postfix[2048]; */
 
 //>>TSMP-PDAF internal change beginning (compare to AdvanceRichards)
   // int Stepcount = 0;            /* Added for transient EvapTrans file management - NBE */
@@ -4564,7 +5063,7 @@ PseudoAdvanceRichards(PFModule * this_module, double start_time,      /* Startin
   double pfl_step = GetDouble("TimeStep.Value");
   double pfl_stop = GetDouble("TimingInfo.StopTime");
   //>>TSMP-PDAF internal change beginning (compare to AdvanceRichards)
-  double pfl_start = GetDouble("TimingInfo.StartTime");
+  /* double pfl_start = GetDouble("TimingInfo.StartTime"); */
   //>>TSMP-PDAF internal change end
 
   int is;
@@ -4641,25 +5140,18 @@ TeardownRichards(PFModule * this_module)
   FreeVector(instance_xtra->x_velocity);
   FreeVector(instance_xtra->y_velocity);
   FreeVector(instance_xtra->z_velocity);
+  FreeVector(instance_xtra->q_overlnd_x);
+
+  FreeVector(instance_xtra->q_overlnd_y);
   FreeVector(instance_xtra->evap_trans);
 
-  if (instance_xtra->evap_trans_sum)
-  {
-    FreeVector(instance_xtra->evap_trans_sum);
-  }
-
-  if (instance_xtra->overland_sum)
-  {
-    FreeVector(instance_xtra->overland_sum);
-  }
+  FreeVector(instance_xtra->evap_trans_sum);
+  FreeVector(instance_xtra->overland_sum);
 
 #ifdef HAVE_CLM
   if (instance_xtra->eflx_lh_tot)
   {
-    if (instance_xtra->clm_out_grid)
-    {
-      FreeVector(instance_xtra->clm_out_grid);
-    }
+    FreeVector(instance_xtra->clm_out_grid);
 
     FreeVector(instance_xtra->eflx_lh_tot);
     FreeVector(instance_xtra->eflx_lwrad_out);
@@ -5022,7 +5514,7 @@ SolverRichardsInitInstanceXtra()
     (instance_xtra->nonlin_solver) =
       PFModuleNewInstanceType(NonlinSolverInitInstanceXtraInvoke,
                               public_xtra->nonlin_solver,
-                              (problem, grid, instance_xtra->problem_data,
+                              (problem, grid, grid2d, instance_xtra->problem_data,
                                NULL));
   }
   else
@@ -5118,7 +5610,7 @@ SolverRichardsInitInstanceXtra()
   /* renew nonlinear solver module */
   PFModuleReNewInstanceType(NonlinSolverInitInstanceXtraInvoke,
                             (instance_xtra->nonlin_solver),
-                            (NULL, NULL, instance_xtra->problem_data,
+                            (NULL, NULL, NULL, instance_xtra->problem_data,
                              temp_data));
 
   /* renew set_problem_data module */
@@ -5453,6 +5945,285 @@ SolverRichardsNewPublicXtra(char *name)
   sprintf(key, "%s.CLM.FieldCapacity", name);
   public_xtra->clm_veg_fieldc = GetDoubleDefault(key, 1.0);
 
+  /* @RMM 2025 Snow parameterization options */
+  NameArray snow_switch_na;
+  snow_switch_na = NA_NewNameArray("CLM WetbulbThreshold WetbulbLinear Dai Jennings");
+  sprintf(key, "%s.CLM.SnowPartition", name);
+  switch_name = GetStringDefault(key, "CLM");
+  switch_value = NA_NameToIndexExitOnError(snow_switch_na, switch_name, key);
+  switch (switch_value)
+  {
+    case 0:
+    {
+      public_xtra->clm_snow_partition = 0;
+      break;
+    }
+
+    case 1:
+    {
+      public_xtra->clm_snow_partition = 1;
+      break;
+    }
+
+    case 2:
+    {
+      public_xtra->clm_snow_partition = 2;
+      break;
+    }
+
+    case 3:
+    {
+      public_xtra->clm_snow_partition = 3;
+      break;
+    }
+
+    case 4:
+    {
+      public_xtra->clm_snow_partition = 4;
+      break;
+    }
+
+    default:
+    {
+      InputError("Invalid switch value <%s> for key <%s>", switch_name, key);
+    }
+  }
+  NA_FreeNameArray(snow_switch_na);
+
+  sprintf(key, "%s.CLM.WetbulbThreshold", name);
+  public_xtra->clm_tw_threshold = GetDoubleDefault(key, 274.15);
+
+  sprintf(key, "%s.CLM.SnowTCrit", name);
+  public_xtra->clm_snow_tcrit = GetDoubleDefault(key, 2.5);
+
+  sprintf(key, "%s.CLM.SnowTLow", name);
+  public_xtra->clm_snow_t_low = GetDoubleDefault(key, 273.16);
+
+  sprintf(key, "%s.CLM.SnowTHigh", name);
+  public_xtra->clm_snow_t_high = GetDoubleDefault(key, 275.16);
+
+  sprintf(key, "%s.CLM.SnowTransitionWidth", name);
+  public_xtra->clm_snow_transition_width = GetDoubleDefault(key, 1.0);
+
+  sprintf(key, "%s.CLM.DaiCoeffA", name);
+  public_xtra->clm_dai_a = GetDoubleDefault(key, -48.2292);
+
+  sprintf(key, "%s.CLM.DaiCoeffB", name);
+  public_xtra->clm_dai_b = GetDoubleDefault(key, 0.7205);
+
+  sprintf(key, "%s.CLM.DaiCoeffC", name);
+  public_xtra->clm_dai_c = GetDoubleDefault(key, 1.1662);
+
+  sprintf(key, "%s.CLM.DaiCoeffD", name);
+  public_xtra->clm_dai_d = GetDoubleDefault(key, 1.0223);
+
+  sprintf(key, "%s.CLM.JenningsCoeffA", name);
+  public_xtra->clm_jennings_a = GetDoubleDefault(key, -10.04);
+
+  sprintf(key, "%s.CLM.JenningsCoeffB", name);
+  public_xtra->clm_jennings_b = GetDoubleDefault(key, 1.41);
+
+  sprintf(key, "%s.CLM.JenningsCoeffG", name);
+  public_xtra->clm_jennings_g = GetDoubleDefault(key, 0.09);
+
+  sprintf(key, "%s.CLM.ThinSnowDamping", name);
+  public_xtra->clm_thin_snow_damping = GetDoubleDefault(key, 0.0);
+
+  sprintf(key, "%s.CLM.ThinSnowThreshold", name);
+  public_xtra->clm_thin_snow_threshold = GetDoubleDefault(key, 50.0);
+
+  /* @RMM 2025 SZA-based snow melt damping */
+  sprintf(key, "%s.CLM.SZASnowDamping", name);
+  public_xtra->clm_sza_snow_damping = GetDoubleDefault(key, 1.0);
+
+  sprintf(key, "%s.CLM.SZADampingCoszenRef", name);
+  public_xtra->clm_sza_damping_coszen_ref = GetDoubleDefault(key, 0.5);
+
+  sprintf(key, "%s.CLM.SZADampingCoszenMin", name);
+  public_xtra->clm_sza_damping_coszen_min = GetDoubleDefault(key, 0.1);
+
+  /* @RMM 2025 Snow albedo parameterization options */
+  NameArray albedo_switch_na;
+  albedo_switch_na = NA_NewNameArray("CLM VIC Tarboton");
+  sprintf(key, "%s.CLM.AlbedoScheme", name);
+  switch_name = GetStringDefault(key, "CLM");
+  switch_value = NA_NameToIndexExitOnError(albedo_switch_na, switch_name, key);
+  switch (switch_value)
+  {
+    case 0:
+    {
+      public_xtra->clm_albedo_scheme = 0;
+      break;
+    }
+
+    case 1:
+    {
+      public_xtra->clm_albedo_scheme = 1;
+      break;
+    }
+
+    case 2:
+    {
+      public_xtra->clm_albedo_scheme = 2;
+      break;
+    }
+
+    default:
+    {
+      InputError("Invalid switch value <%s> for key <%s>", switch_name, key);
+    }
+  }
+  NA_FreeNameArray(albedo_switch_na);
+
+  sprintf(key, "%s.CLM.AlbedoVisNew", name);
+  public_xtra->clm_albedo_vis_new = GetDoubleDefault(key, 0.95);
+
+  sprintf(key, "%s.CLM.AlbedoNirNew", name);
+  public_xtra->clm_albedo_nir_new = GetDoubleDefault(key, 0.65);
+
+  sprintf(key, "%s.CLM.AlbedoMin", name);
+  public_xtra->clm_albedo_min = GetDoubleDefault(key, 0.4);
+
+  sprintf(key, "%s.CLM.AlbedoDecayVis", name);
+  public_xtra->clm_albedo_decay_vis = GetDoubleDefault(key, 0.5);
+
+  sprintf(key, "%s.CLM.AlbedoDecayNir", name);
+  public_xtra->clm_albedo_decay_nir = GetDoubleDefault(key, 0.2);
+
+  sprintf(key, "%s.CLM.AlbedoAccumA", name);
+  public_xtra->clm_albedo_accum_a = GetDoubleDefault(key, 0.94);
+
+  sprintf(key, "%s.CLM.AlbedoThawA", name);
+  public_xtra->clm_albedo_thaw_a = GetDoubleDefault(key, 0.82);
+
+  /* @RMM 2025 Fractional snow covered area (frac_sno) options */
+  NameArray frac_sno_switch_na;
+  frac_sno_switch_na = NA_NewNameArray("CLM SZA");
+  sprintf(key, "%s.CLM.FracSnoScheme", name);
+  switch_name = GetStringDefault(key, "CLM");
+  switch_value = NA_NameToIndexExitOnError(frac_sno_switch_na, switch_name, key);
+  switch (switch_value)
+  {
+    case 0:
+    {
+      public_xtra->clm_frac_sno_type = 0;
+      break;
+    }
+
+    case 1:
+    {
+      public_xtra->clm_frac_sno_type = 1;
+      break;
+    }
+
+    default:
+    {
+      InputError("Invalid switch value <%s> for key <%s>", switch_name, key);
+    }
+  }
+  NA_FreeNameArray(frac_sno_switch_na);
+
+  sprintf(key, "%s.CLM.FracSnoRoughness", name);
+  public_xtra->clm_frac_sno_roughness = GetDoubleDefault(key, 0.01);
+
+  sprintf(key, "%s.CLM.FracSnoRoughnessMin", name);
+  public_xtra->clm_frac_sno_roughness_min = GetDoubleDefault(key, 1e-8);
+
+  sprintf(key, "%s.CLM.FracSnoRoughnessMax", name);
+  public_xtra->clm_frac_sno_roughness_max = GetDoubleDefault(key, 0.2);
+
+  sprintf(key, "%s.CLM.FracSnoGammaSZA", name);
+  public_xtra->clm_frac_sno_gamma_sza = GetDoubleDefault(key, 4.0);
+
+  sprintf(key, "%s.CLM.FracSnoAvgWindow", name);
+  public_xtra->clm_frac_sno_tau_sza = GetDoubleDefault(key, 72.0);
+
+  /* @RMM 2025 Snow age VIS/NIR separation parameters */
+  sprintf(key, "%s.CLM.SnowAgeTau0Vis", name);
+  public_xtra->clm_snowage_tau0_vis = GetDoubleDefault(key, 1.0e6);
+
+  sprintf(key, "%s.CLM.SnowAgeTau0Nir", name);
+  public_xtra->clm_snowage_tau0_nir = GetDoubleDefault(key, 1.0e6);
+
+  sprintf(key, "%s.CLM.SnowAgeGrainGrowthVis", name);
+  public_xtra->clm_snowage_grain_growth_vis = GetDoubleDefault(key, 5000.0);
+
+  sprintf(key, "%s.CLM.SnowAgeGrainGrowthNir", name);
+  public_xtra->clm_snowage_grain_growth_nir = GetDoubleDefault(key, 5000.0);
+
+  sprintf(key, "%s.CLM.SnowAgeDirtSootVis", name);
+  public_xtra->clm_snowage_dirt_soot_vis = GetDoubleDefault(key, 0.3);
+
+  sprintf(key, "%s.CLM.SnowAgeDirtSootNir", name);
+  public_xtra->clm_snowage_dirt_soot_nir = GetDoubleDefault(key, 0.3);
+
+  sprintf(key, "%s.CLM.SnowAgeResetFactor", name);
+  public_xtra->clm_snowage_reset_factor = GetDoubleDefault(key, 0.1);
+
+  /* @RMM 2026 ET formulation improvements */
+  sprintf(key, "%s.CLM.InterceptionFpiMax", name);
+  public_xtra->clm_interception_fpi_max = GetDoubleDefault(key, 0.25);
+
+  sprintf(key, "%s.CLM.FwetExponent", name);
+  public_xtra->clm_fwet_exponent = GetDoubleDefault(key, 0.6667);
+
+  NameArray stomata_switch_na;
+  stomata_switch_na = NA_NewNameArray("BallBerry Medlyn");
+  sprintf(key, "%s.CLM.StomataScheme", name);
+  switch_name = GetStringDefault(key, "BallBerry");
+  switch_value = NA_NameToIndexExitOnError(stomata_switch_na, switch_name, key);
+  switch (switch_value)
+  {
+    case 0:
+    {
+      public_xtra->clm_stomata_scheme = 0;
+      break;
+    }
+
+    case 1:
+    {
+      public_xtra->clm_stomata_scheme = 1;
+      break;
+    }
+
+    default:
+    {
+      InputError("Error: Invalid value <%s> for key <%s>. Expected BallBerry or Medlyn.\n",
+                 switch_name, key);
+    }
+  }
+  NA_FreeNameArray(stomata_switch_na);
+
+  NameArray intercep_scheme_na;
+  intercep_scheme_na = NA_NewNameArray("CLM3 CLM5Tanh");
+  sprintf(key, "%s.CLM.InterceptionScheme", name);
+  switch_name = GetStringDefault(key, "CLM3");
+  switch_value = NA_NameToIndexExitOnError(intercep_scheme_na, switch_name, key);
+  switch (switch_value)
+  {
+    case 0:
+    {
+      public_xtra->clm_interception_scheme = 0;
+      break;
+    }
+
+    case 1:
+    {
+      public_xtra->clm_interception_scheme = 1;
+      break;
+    }
+
+    default:
+    {
+      InputError("Error: Invalid value <%s> for key <%s>. Expected CLM3 or CLM5Tanh.\n",
+                 switch_name, key);
+    }
+  }
+  NA_FreeNameArray(intercep_scheme_na);
+
+  sprintf(key, "%s.CLM.InterceptionTanhAlpha", name);
+  public_xtra->clm_interception_tanh_alpha = GetDoubleDefault(key, 1.0);
+
   /* IMF Write CLM as Silo (default=False) */
   sprintf(key, "%s.WriteSiloCLM", name);
   switch_name = GetStringDefault(key, "False");
@@ -5766,6 +6537,11 @@ SolverRichardsNewPublicXtra(char *name)
   switch_value = NA_NameToIndexExitOnError(switch_na, switch_name, key);
   public_xtra->print_top = switch_value;
 
+  sprintf(key, "%s.PrintBottom", name);
+  switch_name = GetStringDefault(key, "False");
+  switch_value = NA_NameToIndexExitOnError(switch_na, switch_name, key);
+  public_xtra->print_bottom = switch_value;
+
   sprintf(key, "%s.PrintPressure", name);
   switch_name = GetStringDefault(key, "True");
   switch_value = NA_NameToIndexExitOnError(switch_na, switch_name, key);
@@ -5816,6 +6592,16 @@ SolverRichardsNewPublicXtra(char *name)
   switch_value = NA_NameToIndexExitOnError(switch_na, switch_name, key);
   public_xtra->print_overland_bc_flux = switch_value;
 
+  sprintf(key, "%s.PrintQxOverland", name);
+  switch_name = GetStringDefault(key, "False");
+  switch_value = NA_NameToIndexExitOnError(switch_na, switch_name, key);
+  public_xtra->print_qx_overland = switch_value;
+
+  sprintf(key, "%s.PrintQyOverland", name);
+  switch_name = GetStringDefault(key, "False");
+  switch_value = NA_NameToIndexExitOnError(switch_na, switch_name, key);
+  public_xtra->print_qy_overland = switch_value;
+
   sprintf(key, "%s.PrintWells", name);
   switch_name = GetStringDefault(key, "True");
   switch_value = NA_NameToIndexExitOnError(switch_na, switch_name, key);
@@ -5841,7 +6627,170 @@ SolverRichardsNewPublicXtra(char *name)
   }
 #endif
 
+  /* PDI file writing control */
+
+  sprintf(key, "%s.WritePDISubsurfData", name);
+  switch_name = GetStringDefault(key, "True");
+  switch_value = NA_NameToIndex(switch_na, switch_name);
+  if (switch_value < 0)
+  {
+    InputError("Error: invalid print switch value <%s> for key <%s>\n",
+               switch_name, key);
+  }
+  public_xtra->write_pdi_subsurf_data = switch_value;
+
+  sprintf(key, "%s.WritePDIMannings", name);
+  switch_name = GetStringDefault(key, "False");
+  switch_value = NA_NameToIndex(switch_na, switch_name);
+  if (switch_value < 0)
+  {
+    InputError("Error: invalid print switch value <%s> for key <%s>\n",
+               switch_name, key);
+  }
+  public_xtra->write_pdi_mannings = switch_value;
+
+  sprintf(key, "%s.WritePDISlopes", name);
+  switch_name = GetStringDefault(key, "False");
+  switch_value = NA_NameToIndex(switch_na, switch_name);
+  if (switch_value < 0)
+  {
+    InputError("Error: invalid print switch value <%s> for key <%s>\n",
+               switch_name, key);
+  }
+  public_xtra->write_pdi_slopes = switch_value;
+
+  sprintf(key, "%s.WritePDIPressure", name);
+  switch_name = GetStringDefault(key, "False");
+  switch_value = NA_NameToIndex(switch_na, switch_name);
+  if (switch_value < 0)
+  {
+    InputError("Error: invalid value <%s> for key <%s>\n",
+               switch_name, key);
+  }
+  public_xtra->write_pdi_press = switch_value;
+
+  sprintf(key, "%s.WritePDISpecificStorage", name);
+  switch_name = GetStringDefault(key, "False");
+  switch_value = NA_NameToIndex(switch_na, switch_name);
+  if (switch_value < 0)
+  {
+    InputError("Error: invalid print switch value <%s> for key <%s>\n",
+               switch_name, key);
+  }
+  public_xtra->write_pdi_specific_storage = switch_value;
+
+  sprintf(key, "%s.WritePDIVelocities", name);
+  switch_name = GetStringDefault(key, "False");
+  switch_value = NA_NameToIndex(switch_na, switch_name);
+  if (switch_value < 0)
+  {
+    InputError("Error: invalid print switch value <%s> for key <%s>\n",
+               switch_name, key);
+  }
+  public_xtra->write_pdi_velocities = switch_value;
+
+  sprintf(key, "%s.WritePDISaturation", name);
+  switch_name = GetStringDefault(key, "True");
+  switch_value = NA_NameToIndex(switch_na, switch_name);
+  if (switch_value < 0)
+  {
+    InputError("Error: invalid print switch value <%s> for key <%s>\n",
+               switch_name, key);
+  }
+  public_xtra->write_pdi_satur = switch_value;
+
+  sprintf(key, "%s.WritePDIMask", name);
+  switch_name = GetStringDefault(key, "True");
+  switch_value = NA_NameToIndex(switch_na, switch_name);
+  if (switch_value < 0)
+  {
+    InputError("Error: invalid print switch value <%s> for key <%s>\n",
+               switch_name, key);
+  }
+  public_xtra->write_pdi_mask = switch_value;
+
+  // sprintf(key, "%s.WritePDIConcentration", name);
+  // switch_name = GetStringDefault(key, "True");
+  // switch_value = NA_NameToIndex(switch_na, switch_name);
+  // if (switch_value < 0)
+  // {
+  //   InputError("Error: invalid print switch value <%s> for key <%s>\n",
+  //              switch_name, key);
+  // }
+  // public_xtra->write_pdi_concen = switch_value;
+
+  sprintf(key, "%s.WritePDIDZMultiplier", name);
+  switch_name = GetStringDefault(key, "False");
+  switch_value = NA_NameToIndex(switch_na, switch_name);
+  if (switch_value < 0)
+  {
+    InputError("Error: invalid print switch value <%s> for key <%s>\n",
+               switch_name, key);
+  }
+  public_xtra->write_pdi_dzmult = switch_value;
+
+  sprintf(key, "%s.WritePDIEvapTrans", name);
+  switch_name = GetStringDefault(key, "False");
+  switch_value = NA_NameToIndex(switch_na, switch_name);
+  if (switch_value < 0)
+  {
+    InputError("Error: invalid print switch value <%s> for key <%s>\n",
+               switch_name, key);
+  }
+  public_xtra->write_pdi_evaptrans = switch_value;
+
+  sprintf(key, "%s.WritePDIEvapTransSum", name);
+  switch_name = GetStringDefault(key, "False");
+  switch_value = NA_NameToIndex(switch_na, switch_name);
+  if (switch_value < 0)
+  {
+    InputError("Error: invalid print switch value <%s> for key <%s>\n",
+               switch_name, key);
+  }
+  public_xtra->write_pdi_evaptrans_sum = switch_value;
+
+  sprintf(key, "%s.WritePDIOverlandSum", name);
+  switch_name = GetStringDefault(key, "False");
+  switch_value = NA_NameToIndex(switch_na, switch_name);
+  if (switch_value < 0)
+  {
+    InputError("Error: invalid print switch value <%s> for key <%s>\n",
+               switch_name, key);
+  }
+  public_xtra->write_pdi_overland_sum = switch_value;
+
+  sprintf(key, "%s.WritePDIOverlandBCFlux", name);
+  switch_name = GetStringDefault(key, "False");
+  switch_value = NA_NameToIndex(switch_na, switch_name);
+  if (switch_value < 0)
+  {
+    InputError("Error: invalid print switch value <%s> for key <%s>\n",
+               switch_name, key);
+  }
+  public_xtra->write_pdi_overland_bc_flux = switch_value;
+
+  sprintf(key, "%s.WritePDIQxOverland", name);
+  switch_name = GetStringDefault(key, "False");
+  switch_value = NA_NameToIndex(switch_na, switch_name);
+  if (switch_value < 0)
+  {
+    InputError("Error: invalid print switch value <%s> for key <%s>\n",
+               switch_name, key);
+  }
+  public_xtra->write_pdi_qx_overland = switch_value;
+
+  sprintf(key, "%s.WritePDIQyOverland", name);
+  switch_name = GetStringDefault(key, "False");
+  switch_value = NA_NameToIndex(switch_na, switch_name);
+  if (switch_value < 0)
+  {
+    InputError("Error: invalid print switch value <%s> for key <%s>\n",
+               switch_name, key);
+  }
+  public_xtra->write_pdi_qy_overland = switch_value;
+
   /* Silo file writing control */
+
   sprintf(key, "%s.WriteSiloSubsurfData", name);
   switch_name = GetStringDefault(key, "False");
   switch_value = NA_NameToIndexExitOnError(switch_na, switch_name, key);
@@ -5881,6 +6830,16 @@ SolverRichardsNewPublicXtra(char *name)
   switch_name = GetStringDefault(key, "False");
   switch_value = NA_NameToIndexExitOnError(switch_na, switch_name, key);
   public_xtra->write_silo_overland_bc_flux = switch_value;
+
+  sprintf(key, "%s.WriteSiloQxOverland", name);
+  switch_name = GetStringDefault(key, "False");
+  switch_value = NA_NameToIndexExitOnError(switch_na, switch_name, key);
+  public_xtra->write_silo_qx_overland = switch_value;
+
+  sprintf(key, "%s.WriteSiloQyOverland", name);
+  switch_name = GetStringDefault(key, "False");
+  switch_value = NA_NameToIndexExitOnError(switch_na, switch_name, key);
+  public_xtra->write_silo_qy_overland = switch_value;
 
   sprintf(key, "%s.WriteSiloDZMultiplier", name);
   switch_name = GetStringDefault(key, "False");
@@ -5958,6 +6917,24 @@ SolverRichardsNewPublicXtra(char *name)
     public_xtra->numVarTimeVariant++;
   }
   public_xtra->write_netcdf_overland_bc_flux = switch_value;
+
+  sprintf(key, "NetCDF.WriteQxOverland");
+  switch_name = GetStringDefault(key, "False");
+  switch_value = NA_NameToIndexExitOnError(switch_na, switch_name, key);
+  if (switch_value == 1)
+  {
+    public_xtra->numVarTimeVariant++;
+  }
+  public_xtra->write_netcdf_qx_overland = switch_value;
+
+  sprintf(key, "NetCDF.WriteQyOverland");
+  switch_name = GetStringDefault(key, "False");
+  switch_value = NA_NameToIndexExitOnError(switch_na, switch_name, key);
+  if (switch_value == 1)
+  {
+    public_xtra->numVarTimeVariant++;
+  }
+  public_xtra->write_netcdf_qy_overland = switch_value;
 
   sprintf(key, "NetCDF.WriteMannings");
   switch_name = GetStringDefault(key, "False");
@@ -6089,6 +7066,10 @@ SolverRichardsNewPublicXtra(char *name)
   switch_value = NA_NameToIndexExitOnError(switch_na, switch_name, key);
   public_xtra->write_silo_top = switch_value;
 
+  sprintf(key, "%s.WriteSiloBottom", name);
+  switch_name = GetStringDefault(key, "False");
+  switch_value = NA_NameToIndexExitOnError(switch_na, switch_name, key);
+  public_xtra->write_silo_bottom = switch_value;
 
   /* Initialize silo if necessary */
   if (public_xtra->write_silo_subsurf_data ||
@@ -6103,6 +7084,7 @@ SolverRichardsNewPublicXtra(char *name)
       public_xtra->write_silo_mannings ||
       public_xtra->write_silo_mask ||
       public_xtra->write_silo_top ||
+      public_xtra->write_silo_bottom ||
       public_xtra->write_silo_overland_sum ||
       public_xtra->write_silo_overland_bc_flux ||
       public_xtra->write_silo_dzmult || public_xtra->write_silo_CLM)
@@ -6231,6 +7213,11 @@ SolverRichardsNewPublicXtra(char *name)
   switch_name = GetStringDefault(key, "False");
   switch_value = NA_NameToIndexExitOnError(switch_na, switch_name, key);
   public_xtra->surface_predictor_print = switch_value;
+
+  sprintf(key, "%s.SurfacePredictor.LateralFlows", name);
+  switch_name = GetStringDefault(key, "False");
+  switch_value = NA_NameToIndexExitOnError(switch_na, switch_name, key);
+  public_xtra->surface_lateral_flows = switch_value;
 
 
 
