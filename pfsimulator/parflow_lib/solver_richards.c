@@ -4928,29 +4928,29 @@ PseudoAdvanceRichards(PFModule * this_module, double start_time,      /* Startin
   printf("Pseudo richard for OAS init\n");
   //>>TSMP-PDAF internal change end
 
-  PublicXtra *public_xtra = (PublicXtra*)PFModulePublicXtra(this_module);
+  /* PublicXtra *public_xtra = (PublicXtra*)PFModulePublicXtra(this_module); */
   InstanceXtra *instance_xtra =
     (InstanceXtra*)PFModuleInstanceXtra(this_module);
-  Problem *problem = (public_xtra->problem);
+  /* Problem *problem = (public_xtra->problem); */
 
-  int max_iterations = (public_xtra->max_iterations);
-  int print_satur = (public_xtra->print_satur);
-  int print_wells = (public_xtra->print_wells);
+  /* int max_iterations = (public_xtra->max_iterations); */
+  /* int print_satur = (public_xtra->print_satur); */
+  /* int print_wells = (public_xtra->print_wells); */
 
-  PFModule *problem_saturation = (instance_xtra->problem_saturation);
-  PFModule *phase_density = (instance_xtra->phase_density);
-  PFModule *select_time_step = (instance_xtra->select_time_step);
-  PFModule *l2_error_norm = (instance_xtra->l2_error_norm);
-  PFModule *nonlin_solver = (instance_xtra->nonlin_solver);
+  /* PFModule *problem_saturation = (instance_xtra->problem_saturation); */
+  /* PFModule *phase_density = (instance_xtra->phase_density); */
+  /* PFModule *select_time_step = (instance_xtra->select_time_step); */
+  /* PFModule *l2_error_norm = (instance_xtra->l2_error_norm); */
+  /* PFModule *nonlin_solver = (instance_xtra->nonlin_solver); */
 
-  ProblemData *problem_data = (instance_xtra->problem_data);
+  /* ProblemData *problem_data = (instance_xtra->problem_data); */
 
-  int start_count = ProblemStartCount(problem);
-  double dump_interval = ProblemDumpInterval(problem);
+  /* int start_count = ProblemStartCount(problem); */
+  /* double dump_interval = ProblemDumpInterval(problem); */
 
-  Vector *porosity = ProblemDataPorosity(problem_data);
-  Vector *evap_trans_sum = instance_xtra->evap_trans_sum;
-  Vector *overland_sum = instance_xtra->overland_sum;   /* sk: Vector of outflow at the boundary */
+  /* Vector *porosity = ProblemDataPorosity(problem_data); */
+  /* Vector *evap_trans_sum = instance_xtra->evap_trans_sum; */
+  /* Vector *overland_sum = instance_xtra->overland_sum;   /\* sk: Vector of outflow at the boundary *\/ */
 
   if (evap_trans == NULL)
   {
@@ -4960,8 +4960,8 @@ PseudoAdvanceRichards(PFModule * this_module, double start_time,      /* Startin
 #ifdef HAVE_OAS3
   Grid *grid = (instance_xtra->grid);
   Subgrid *subgrid;
-  Subvector *p_sub, *s_sub, *et_sub, *m_sub, *po_sub, *dz_sub;
-  double *pp, *sp, *et, *ms, *po_dat, *dz_dat;
+  /* Subvector *p_sub, *s_sub, *et_sub, *m_sub, *po_sub, *dz_sub; */
+  /* double *pp, *sp, *et, *ms, *po_dat, *dz_dat; */
   double sw_lat = .0;
   double sw_lon = .0;
 #endif
@@ -5024,29 +5024,29 @@ PseudoAdvanceRichards(PFModule * this_module, double start_time,      /* Startin
 // #endif
 //>>TSMP-PDAF internal change end
 
-  int any_file_dumped;
-  int clm_file_dumped;
-  int dump_files = 0;
+  /* int any_file_dumped; */
+  /* int clm_file_dumped; */
+  /* int dump_files = 0; */
 
-  int retval;
-  int converged;
-  int take_more_time_steps;
-  int conv_failures;
-  int max_failures = public_xtra->max_convergence_failures;
+  /* int retval; */
+  /* int converged; */
+  /* int take_more_time_steps; */
+  /* int conv_failures; */
+  /* int max_failures = public_xtra->max_convergence_failures; */
 
-  double t;
-  double dt = 0.0;
-  double ct = 0.0;
-  double cdt = 0.0;
-  double print_dt;
-  double dtmp, err_norm;
-  double gravity = ProblemGravity(problem);
+  /* double t; */
+  /* double dt = 0.0; */
+  /* double ct = 0.0; */
+  /* double cdt = 0.0; */
+  /* double print_dt; */
+  /* double dtmp, err_norm; */
+  /* double gravity = ProblemGravity(problem); */
 
-  VectorUpdateCommHandle *handle;
+  /* VectorUpdateCommHandle *handle; */
 
-  char dt_info;
-  char file_prefix[2048], file_type[2048], file_postfix[2048];
-  char nc_postfix[2048];
+  /* char dt_info; */
+  char file_prefix[2048];//, file_type[2048], file_postfix[2048];
+  /* char nc_postfix[2048]; */
 
 //>>TSMP-PDAF internal change beginning (compare to AdvanceRichards)
   // int Stepcount = 0;            /* Added for transient EvapTrans file management - NBE */
@@ -5063,7 +5063,7 @@ PseudoAdvanceRichards(PFModule * this_module, double start_time,      /* Startin
   double pfl_step = GetDouble("TimeStep.Value");
   double pfl_stop = GetDouble("TimingInfo.StopTime");
   //>>TSMP-PDAF internal change beginning (compare to AdvanceRichards)
-  double pfl_start = GetDouble("TimingInfo.StartTime");
+  /* double pfl_start = GetDouble("TimingInfo.StartTime"); */
   //>>TSMP-PDAF internal change end
 
   int is;
