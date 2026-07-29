@@ -1,5 +1,5 @@
 # Tcl package index file, version 1.0
-if {![package vsatisfies [package provide Tcl] 8.5]} {puts "ERROR : pftools requires TCL 8.5 or greater"; return}
+if {![package vsatisfies [package provide Tcl] 8.5-]} {puts "ERROR : pftools requires TCL 8.5 or greater"; return}
 
 package ifneeded parflow 1.0 [list apply {dir {
     uplevel 1 [list source [file join $dir parflow.tcl]]
@@ -8,7 +8,7 @@ package ifneeded parflow 1.0 [list apply {dir {
     if { [file exists [file join $dir parflow[info sharedlibextension]]] } { 
 	load [file join $dir parflow[info sharedlibextension]]
     } else {
-	load [file join $dir libpftools[info sharedlibextension]] parflow
+	load [file join $dir libpftools[info sharedlibextension]] Parflow
     }
 }} $dir]
 

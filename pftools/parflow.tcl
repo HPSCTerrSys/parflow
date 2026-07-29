@@ -35,11 +35,11 @@ namespace eval Parflow {
     variable IsArchUnix
 
     # Determine which Arch we are running on
-    if { [ string compare $tcl_platform(platform) "windows" ] } {
-	set Parflow::IsArchUnix 1
+    if { [ string compare $::tcl_platform(platform) "windows" ] } {
+	set ::Parflow::IsArchUnix 1
 
     } {
-	set Parflow::IsArchUnix 0
+	set ::Parflow::IsArchUnix 0
     }
 
     #
@@ -47,7 +47,7 @@ namespace eval Parflow {
     #
     proc FixupFilename { filename } {
 
-	if $Parflow::IsArchUnix {
+	if $::Parflow::IsArchUnix {
 	    set new_filename $filename
 	} {
 	    regsub -all \\\\ $filename "/" new_filename
@@ -186,7 +186,7 @@ proc Parflow::pfwritedb {name} {
 
     set file [open [FixupFilename $name.pfidb] "w"]
 
-    foreach i "Parflow::PFDB" {
+    foreach i "::Parflow::PFDB" {
 	PFWriteArray $file $i
     }
 
@@ -199,7 +199,7 @@ proc Parflow::pfwritedb {name} {
 #
 proc Parflow::pfset { key value } {
 
-    set Parflow::PFDB($key) "$value"
+    set ::Parflow::PFDB($key) "$value"
 }
 
 #
@@ -207,14 +207,14 @@ proc Parflow::pfset { key value } {
 #
 proc Parflow::pfget { key } {
 
-    return $Parflow::PFDB($key)
+    return $::Parflow::PFDB($key)
 }
 
 #
 # Tests to see if a value exists
 #
 proc Parflow::pfexists { key } {
-    return [info exists Parflow::PFDB($key)]
+    return [info exists ::Parflow::PFDB($key)]
 }
 
 #
@@ -278,7 +278,7 @@ proc Parflow::pfrun { runname args } {
 	puts [format "Using command : %s" [format $command $NumProcs $runname]]
 	puts [eval exec [format $command $NumProcs $runname]]
     } {
-	puts [eval exec sh $Parflow::PARFLOW_DIR/bin/run  $runname $NumProcs]
+	puts [eval exec sh $::Parflow::PARFLOW_DIR/bin/run  $runname $NumProcs]
     }
 
 }

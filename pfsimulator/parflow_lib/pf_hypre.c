@@ -76,7 +76,7 @@ void CopyParFlowVectorToHypreVector(Vector *rhs,
       index[1] = j;
       index[2] = k;
       
-      HYPRE_StructVectorSetValues(*hypre_b, index, rhs_ptr[iv]);
+      HYPRE_StructVectorSetValues(*hypre_b, index, &rhs_ptr[iv]);
     });
 
   }
