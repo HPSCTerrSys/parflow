@@ -121,31 +121,32 @@ contains
     if (ierror /= 0) call oasis_abort (comp_id, 'oas_pfl_define', 'oasis_enddef failed')
   end subroutine oas_pfl_define
 
-  subroutine send_fld2_clm(pressure, saturation, topo, ix, iy, nx, ny, nz, nx_f, ny_f, pstep, porosity, dz) bind(c, name='send_fld2_clm_')
+  subroutine send_fld2_clm(pressure, saturation, topo, ix, iy, nx, ny, nz, nx_f, ny_f, pstep, porosity, dz, h2osoi_liq) bind(c, name='send_fld2_clm_')
     !----------------------------------------------------------------------------
     ! Sends pressure head and soil liquid water from ParFlow to eCLM
     ! pressure is converted from [m] to [mm]
     ! soil liquid is calculated as: h2osoi_liq = saturation*porosity*dz*1000 
     !----------------------------------------------------------------------------
-    integer,      intent(in)  :: ix, iy,                           & ! starting coordinate of the subgrid (UNUSED)
-                                 nx, ny, nz,                       & ! subgrid dimensions
-                                 nx_f, ny_f                          ! dimensions of ET subvector
-    real(kind=8), intent(in)  :: pstep,                            & ! current model time in hours
-                                 pressure((nx+2)*(ny+2)*(nz+2)),   & ! pressure head [m]
-                                 saturation((nx+2)*(ny+2)*(nz+2)), & ! saturation [-]
-                                 topo((nx+2)*(ny+2)*(nz+2)),       & ! topography mask (0 for inactive, 1 for active)
-                                 porosity((nx+2)*(ny+2)*(nz+2)),   & ! porosity [m^3/m^3]
-                                 dz((nx+2)*(ny+2)*(nz+2))            ! subsurface layer thickness [m]
-                                                                     ! (nx+2)*(ny+2)*(nz+2) = total number of subgrid cells; the
-                                                                     !  extra "+2" terms account for the ghost nodes/halo points
+    integer,      intent(in)    :: ix, iy,                           & ! starting coordinate of the subgrid (UNUSED)
+                                   nx, ny, nz,                       & ! subgrid dimensions
+                                   nx_f, ny_f                          ! dimensions of ET subvector
+    real(kind=8), intent(in)    :: pstep,                            & ! current model time in hours
+                                   pressure((nx+2)*(ny+2)*(nz+2)),   & ! pressure head [m]
+                                   saturation((nx+2)*(ny+2)*(nz+2)), & ! saturation [-]
+                                   topo((nx+2)*(ny+2)*(nz+2)),       & ! topography mask (0 for inactive, 1 for active)
+                                   porosity((nx+2)*(ny+2)*(nz+2)),   & ! porosity [m^3/m^3]
+                                   dz((nx+2)*(ny+2)*(nz+2))            ! subsurface layer thickness [m]
+    real(kind=8), intent(inout) :: h2osoi_liq((nx+2)*(ny+2)*(nz+2))    ! soil liquid water [mm]
+                                                                       ! NOTE: (nx+2)*(ny+2)*(nz+2) = total number of subgrid cells; the
+                                                                       !       extra "+2" terms account for the ghost nodes/halo points
     ! Local variables
-    integer                   :: seconds_elapsed                     ! current model time in seconds
-    integer                   :: i, j, k                             ! index variables for subgrid dimensions (nx, ny, nz)
-    integer                   :: l                                   ! index variable for ParFlow fields (e.g. pressure, saturation, etc.)
-    integer                   :: z                                   ! subsurface level (z=nz topmost layer, z=1 deepest layer)
-    integer                   :: top_z_level(nx,ny)                  ! topmost z level of active ParFlow cells
-    real(kind=8), allocatable :: pressure_3d(:,:,:),               & ! pressure head sent to eCLM   [mm]
-                                 h2osoi_liq_3d(:,:,:)                ! h2o soil liquid sent to eCLM [mm]
+    integer                     :: seconds_elapsed                     ! current model time in seconds
+    integer                     :: i, j, k                             ! index variables for subgrid dimensions (nx, ny, nz)
+    integer                     :: l                                   ! index variable for ParFlow fields (e.g. pressure, saturation, etc.)
+    integer                     :: z                                   ! subsurface level (z=nz topmost layer, z=1 deepest layer)
+    integer                     :: top_z_level(nx,ny)                  ! topmost z level of active ParFlow cells
+    real(kind=8), allocatable   :: pressure_3d(:,:,:),               & ! pressure head sent to eCLM   [mm]
+                                   h2osoi_liq_3d(:,:,:)                ! h2o soil liquid sent to eCLM [mm]
 
     allocate(pressure_3d(nx,ny,nlevgrnd))                             
     allocate(h2osoi_liq_3d(nx,ny,nlevgrnd))
@@ -162,6 +163,7 @@ contains
             l = flattened_array_index(i, j, z, nx_f, ny_f)
             pressure_3d(i,j,k) = pressure(l)*1000.0                       ! multiply these quantities by 1000
             h2osoi_liq_3d(i,j,k) = saturation(l)*porosity(l)*dz(l)*1000   ! to convert from [m] to [mm]
+            h2osoi_liq(l) = h2osoi_liq_3d(i,j,k)
           end do
         end if
       end do
@@ -170,7 +172,10 @@ contains
     ! Send ParFlow fields to eCLM
     seconds_elapsed = nint(pstep*3600.d0)
     call oasis_put(soilliq_id, seconds_elapsed, h2osoi_liq_3d, ierror)
+    !if (ierror /= 0) call oasis_abort(comp_id, 'send_fld2_clm', 'oasis_put failed for PFL_SOILLIQ')
+
     call oasis_put(psi_id, seconds_elapsed, pressure_3d, ierror)
+    !if (ierror /= 0) call oasis_abort(comp_id, 'send_fld2_clm', 'oasis_put failed for PFL_PSI')
 
     deallocate(h2osoi_liq_3d)
     deallocate(pressure_3d)
@@ -201,6 +206,7 @@ contains
     allocate(evap_trans_3d(nx,ny,nlevsoi))
     seconds_elapsed = nint(pstep*3600.d0)
     call oasis_get(et_id, seconds_elapsed, evap_trans_3d, ierror)
+    !if (ierror /= 0) call oasis_abort(comp_id, 'receive_fld2_clm', 'oasis_get failed for PFL_ET')
 
     ! Save ET fluxes to ParFlow evap_trans vector
     evap_trans = 0.

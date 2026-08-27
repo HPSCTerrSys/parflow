@@ -1,4 +1,4 @@
-SUBROUTINE send_fld2_clm(pressure,saturation,topo,ix,iy,nx,ny,nz,nx_f,ny_f,pstep,porosity,dz)
+SUBROUTINE send_fld2_clm(pressure,saturation,topo,ix,iy,nx,ny,nz,nx_f,ny_f,pstep,porosity,dz,h2osoi_liq)
 
 !----------------------------------------------------------------------------
 !
@@ -48,6 +48,7 @@ REAL(KIND=8), INTENT(IN)           :: pressure((nx+2)*(ny+2)*(nz+2)),   &! press
                                       porosity((nx+2)*(ny+2)*(nz+2)),   &! porosity [m^3/m^3]
                                       dz((nx+2)*(ny+2)*(nz+2))           ! subsurface layer thickness [m]
 
+REAL(KIND=8), INTENT(OUT)          :: h2osoi_liq((nx+2)*(ny+2)*(nz+2))   ! Soil liquid water (unused)
                                                                          ! All vectors from parflow on grid w/ ghost nodes for current proc
 !Local Variables 
 

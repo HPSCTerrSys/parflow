@@ -283,6 +283,7 @@ typedef struct {
   int write_netcdf_subsurface;  /* write subsurface? */
   int write_netcdf_slopes;      /* write subsurface? */
   int write_netcdf_dzmult;      /* write subsurface? */
+  int write_netcdf_h2osoi_liq;   /* log soil water to be passed to eCLM */
   int numVarTimeVariant;        /*This variable is added to keep track of number of
                                  * time variant variable in NetCDF file */
   int numVarIni;                /*This variable is added to keep track of number of
@@ -340,6 +341,7 @@ typedef struct {
   Vector *z_velocity;           /* vector containing z-velocity face values */
   Vector *q_overlnd_x;          /* 2D vector containing surface flow in x-direction */
   Vector *q_overlnd_y;          /* 2D vector containing surface flow in y-direction */
+  Vector *h2osoi_liq;       /* running sum of evaporation and transpiration */
 #ifdef HAVE_CLM
   /* RM: vars for pf printing of clm output */
   Vector *eflx_lh_tot;          /* total LH flux from canopy height to atmosphere [W/m^2] */
@@ -1031,6 +1033,9 @@ SetupRichards(PFModule * this_module)
       NewVectorType(grid, 1, 0, vector_cell_centered);
     InitVectorAll(instance_xtra->evap_trans_sum, 0.0);
 
+    instance_xtra->h2osoi_liq = NewVectorType(grid, 1, 1, vector_cell_centered);
+    InitVectorAll(instance_xtra->h2osoi_liq, 0.0);
+
     /* initialize vel vectors - jjb */
     instance_xtra->x_velocity =
       NewVectorType(x_grid, 1, 1, vector_side_centered_x);
@@ -1088,6 +1093,7 @@ SetupRichards(PFModule * this_module)
       handle = InitVectorUpdate(instance_xtra->evap_trans, VectorUpdateAll);
       FinalizeVectorUpdate(handle);
     }
+
 #ifndef HAVE_CLM
     //printf("DEBUG: public_xtra->nc_evap_trans_file_transient = %i \n", public_xtra->nc_evap_trans_file_transient);
     if (public_xtra->nc_evap_trans_file_transient)
@@ -1835,7 +1841,6 @@ SetupRichards(PFModule * this_module)
       any_file_dumped = 1;
     }
 
-
     if (public_xtra->write_silo_mask)
     {
       strcpy(file_postfix, "");
@@ -1940,8 +1945,8 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
 #ifdef HAVE_OAS3
   Grid *grid = (instance_xtra->grid);
   Subgrid *subgrid;
-  Subvector *p_sub, *s_sub, *et_sub, *m_sub, *po_sub, *dz_sub;
-  double *pp, *sp, *et, *ms, *po_dat, *dz_dat;
+  Subvector *p_sub, *s_sub, *et_sub, *m_sub, *po_sub, *dz_sub, *h2osoi_liq_sub;
+  double *pp, *sp, *et, *ms, *po_dat, *dz_dat, *h2osoi_liq_dat;
   double sw_lat = .0;
   double sw_lon = .0;
 #endif
@@ -2157,6 +2162,7 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
         m_sub = VectorSubvector(instance_xtra->mask, is);
         po_sub = VectorSubvector(porosity, is);
         dz_sub = VectorSubvector(instance_xtra->dz_mult, is);
+        h2osoi_liq_sub = VectorSubvector(instance_xtra->h2osoi_liq, is);
 
         ix = SubgridIX(subgrid);
         iy = SubgridIY(subgrid);
@@ -2166,21 +2172,24 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
         nx_f = SubvectorNX(et_sub);
         ny_f = SubvectorNY(et_sub);
 
-
         sp = SubvectorData(s_sub);
         pp = SubvectorData(p_sub);
         et = SubvectorData(et_sub);
         ms = SubvectorData(m_sub);
         po_dat = SubvectorData(po_sub);
         dz_dat = SubvectorData(dz_sub);
+        h2osoi_liq_dat = SubvectorData(h2osoi_liq_sub);
+        //
         //CPS       amps_Printf("Calling oasis send/receive for time  %3.1f \n", t);
         CALL_send_fld2_clm(pp, sp, ms, ix, iy, nx, ny, nz, nx_f, ny_f,
-                           t, po_dat, dz_dat);
+                           t, po_dat, dz_dat, h2osoi_liq_dat);
         amps_Sync(amps_CommWorld);
         CALL_receive_fld2_clm(et, ms, ix, iy, nx, ny, nz, nx_f, ny_f, t);
       }
       amps_Sync(amps_CommWorld);
       handle = InitVectorUpdate(evap_trans, VectorUpdateAll);
+      FinalizeVectorUpdate(handle);
+      handle = InitVectorUpdate(instance_xtra->h2osoi_liq, VectorUpdateAll);
       FinalizeVectorUpdate(handle);
 #endif // end to HAVE_OAS3 CALL
 
@@ -3707,6 +3716,7 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
           || public_xtra->write_netcdf_satur
           || public_xtra->write_netcdf_evaptrans
           || public_xtra->write_netcdf_evaptrans_sum
+          || public_xtra->write_netcdf_h2osoi_liq
           || public_xtra->write_netcdf_overland_sum
           || public_xtra->write_netcdf_overland_bc_flux)
       {
@@ -3920,6 +3930,14 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
         any_file_dumped = 1;
       }
 
+      if (public_xtra->write_netcdf_h2osoi_liq)
+      {
+        sprintf(nc_postfix, "%05d", instance_xtra->file_number);
+        WritePFNC(file_prefix, nc_postfix, t, instance_xtra->h2osoi_liq,
+                  public_xtra->numVarTimeVariant, "h2osoi_liq", 3,
+                  false, public_xtra->numVarIni);
+        any_file_dumped = 1;
+      }
 
       if (public_xtra->print_evaptrans_sum
           || public_xtra->write_silo_evaptrans_sum
@@ -6655,6 +6673,15 @@ SolverRichardsNewPublicXtra(char *name)
     public_xtra->numVarTimeVariant++;
   }
   public_xtra->write_netcdf_evaptrans_sum = switch_value;
+
+  sprintf(key, "NetCDF.WriteH2OSoilLiquid");
+  switch_name = GetStringDefault(key, "False");
+  switch_value = NA_NameToIndexExitOnError(switch_na, switch_name, key);
+  if (switch_value == 1)
+  {
+    public_xtra->numVarTimeVariant++;
+  }
+  public_xtra->write_netcdf_h2osoi_liq = switch_value;
 
   sprintf(key, "NetCDF.WriteOverlandSum");
   switch_name = GetStringDefault(key, "False");
