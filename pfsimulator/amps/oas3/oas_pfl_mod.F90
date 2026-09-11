@@ -158,18 +158,13 @@ contains
 
     allocate(pressure_3d(nx,ny,nlevgrnd))                             
     allocate(h2osoi_liq_3d(nx,ny,nlevgrnd))
+    allocate(porosity_3d(nx,ny,nlevgrnd))
     pressure_3d = spval
     h2osoi_liq_3d = spval
-    top_z_level = get_top_z_level(nx, ny, nz, topo)
-
-    ! Pass porosity on the first coupling timestep
-    seconds_elapsed = nint(pstep*3600.d0)
-    if (seconds_elapsed == 0) then
-      allocate(porosity_3d(nx,ny,nlevgrnd))
-      porosity_3d = spval
-    end if
+    porosity_3d = spval
 
     ! Convert ParFlow fields to 3d array
+    top_z_level = get_top_z_level(nx, ny, nz, topo)
     do i = 1, nx
       do j = 1, ny
         if (top_z_level(i,j) > 0) then    ! ***** Subsurface level indexing convention *****
@@ -187,14 +182,13 @@ contains
     end do
 
     ! Send ParFlow fields to eCLM
+    seconds_elapsed = nint(pstep*3600.d0)
     call oasis_put(soilliq_id, seconds_elapsed, h2osoi_liq_3d, ierror)
     call oasis_put(psi_id, seconds_elapsed, pressure_3d, ierror)
+    call oasis_put(porosity_id, seconds_elapsed, porosity_3d, ierror)
     deallocate(h2osoi_liq_3d)
     deallocate(pressure_3d)
-    if (seconds_elapsed == 0) then
-      call oasis_put(porosity_id, seconds_elapsed, porosity_3d, ierror)
-      deallocate(porosity_3d)
-    end if
+    deallocate(porosity_3d)
   end subroutine send_fld2_clm
 
   subroutine receive_fld2_clm(evap_trans, topo, ix, iy, nx, ny, nz, nx_f, ny_f, pstep) bind(c, name='receive_fld2_clm_')
