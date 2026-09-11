@@ -30,12 +30,15 @@ module oas_pfl_mod
 
   ! Local variables used by OASIS
   integer :: comp_id, rank, ierror
-  integer :: soilliq_id, psi_id, et_id ! coupling field IDs
+  integer :: porosity_id, soilliq_id, psi_id, et_id ! coupling field IDs
 
   ! TODO: Get these values from eCLM instead of hardcoding it here
-  integer :: nlevsoi  = 20 ! Number of hydrologically active soil layers in eCLM
-  integer :: nlevgrnd = 25 ! Total number of soil layers in eCLM
+  integer :: nlevsoi  = 20   ! Number of hydrologically active soil layers in eCLM
+  integer :: nlevgrnd = 25   ! Total number of soil layers in eCLM
 
+  ! Represent unset values
+  integer,  parameter :: r8 = selected_real_kind(8)
+  real(r8), parameter :: spval = 1.e36_r8
 contains
 
   subroutine oas_pfl_init(argc) bind(c, name='oas_pfl_init_')
@@ -114,8 +117,12 @@ contains
     var_nodims(2) = nlevgrnd
     call oasis_def_var (psi_id, "PFL_PSI", part_id, var_nodims, OASIS_Out, OASIS_Real, ierror)
     if (ierror /= 0) call oasis_abort(comp_id, 'oas_pfl_define', 'oasis_def_var failed for PFL_PSI')
+
     call oasis_def_var (soilliq_id, "PFL_SOILLIQ", part_id, var_nodims, OASIS_Out, OASIS_Real, ierror)
     if (ierror /= 0) call oasis_abort(comp_id, 'oas_pfl_define', 'oasis_def_var failed for PFL_SOILLIQ')
+
+    call oasis_def_var (porosity_id, "PFL_POROSITY", part_id, var_nodims, OASIS_Out, OASIS_Real, ierror)
+    if (ierror /= 0) call oasis_abort(comp_id, 'oas_pfl_define', 'oasis_def_var failed for PFL_POROSITY')
 
     call oasis_enddef ( ierror )
     if (ierror /= 0) call oasis_abort (comp_id, 'oas_pfl_define', 'oasis_enddef failed')
@@ -138,6 +145,7 @@ contains
                                  dz((nx+2)*(ny+2)*(nz+2))            ! subsurface layer thickness [m]
                                                                      ! (nx+2)*(ny+2)*(nz+2) = total number of subgrid cells; the
                                                                      !  extra "+2" terms account for the ghost nodes/halo points
+
     ! Local variables
     integer                   :: seconds_elapsed                     ! current model time in seconds
     integer                   :: i, j, k                             ! index variables for subgrid dimensions (nx, ny, nz)
@@ -145,13 +153,21 @@ contains
     integer                   :: z                                   ! subsurface level (z=nz topmost layer, z=1 deepest layer)
     integer                   :: top_z_level(nx,ny)                  ! topmost z level of active ParFlow cells
     real(kind=8), allocatable :: pressure_3d(:,:,:),               & ! pressure head sent to eCLM   [mm]
-                                 h2osoi_liq_3d(:,:,:)                ! h2o soil liquid sent to eCLM [mm]
+                                 h2osoi_liq_3d(:,:,:),             & ! h2o soil liquid sent to eCLM [mm]
+                                 porosity_3d(:,:,:)                  ! porosity sent to eCLM [m^3/m^3]
 
     allocate(pressure_3d(nx,ny,nlevgrnd))                             
     allocate(h2osoi_liq_3d(nx,ny,nlevgrnd))
-    pressure_3d = 0.0
-    h2osoi_liq_3d = 0.0
+    pressure_3d = spval
+    h2osoi_liq_3d = spval
     top_z_level = get_top_z_level(nx, ny, nz, topo)
+
+    ! Pass porosity on the first coupling timestep
+    seconds_elapsed = nint(pstep*3600.d0)
+    if (seconds_elapsed == 0) then
+      allocate(porosity_3d(nx,ny,nlevgrnd))
+      porosity_3d = spval
+    end if
 
     ! Convert ParFlow fields to 3d array
     do i = 1, nx
@@ -162,18 +178,23 @@ contains
             l = flattened_array_index(i, j, z, nx_f, ny_f)
             pressure_3d(i,j,k) = pressure(l)*1000.0                       ! multiply these quantities by 1000
             h2osoi_liq_3d(i,j,k) = saturation(l)*porosity(l)*dz(l)*1000   ! to convert from [m] to [mm]
+            if (seconds_elapsed == 0) then
+              porosity_3d(i,j,k) = porosity(l)
+            end if
           end do
         end if
       end do
     end do
 
     ! Send ParFlow fields to eCLM
-    seconds_elapsed = nint(pstep*3600.d0)
     call oasis_put(soilliq_id, seconds_elapsed, h2osoi_liq_3d, ierror)
     call oasis_put(psi_id, seconds_elapsed, pressure_3d, ierror)
-
     deallocate(h2osoi_liq_3d)
     deallocate(pressure_3d)
+    if (seconds_elapsed == 0) then
+      call oasis_put(porosity_id, seconds_elapsed, porosity_3d, ierror)
+      deallocate(porosity_3d)
+    end if
   end subroutine send_fld2_clm
 
   subroutine receive_fld2_clm(evap_trans, topo, ix, iy, nx, ny, nz, nx_f, ny_f, pstep) bind(c, name='receive_fld2_clm_')
