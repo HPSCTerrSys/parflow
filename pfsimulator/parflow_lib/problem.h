@@ -159,6 +159,9 @@ typedef struct {
   Vector         *old_porosity;       /* porosity used by previous timestep */
   Vector         *ice_liq_delta;      /* liquid-equivalent volume frozen [-]  */
 #endif
+#ifdef HAVE_ECLM
+  Vector         *ice_impedance;      /* soil ice impedance from eCLM [-] */
+#endif
 
   Vector         *specific_storage;   //sk
 
@@ -296,6 +299,9 @@ typedef struct {
 #ifdef HAVE_OAS3
 #define ProblemDataOldPorosity(problem_data)    ((problem_data)->old_porosity)
 #define ProblemDataIceLiqDelta(problem_data)    ((problem_data)->ice_liq_delta)
+#endif
+#ifdef HAVE_ECLM
+#define ProblemDataIceImpedance(problem_data)   ((problem_data)->ice_impedance)
 #endif
 #define ProblemDataFBx(problem_data)            ((problem_data)->FBx)    //RMM
 #define ProblemDataFBy(problem_data)            ((problem_data)->FBy)    //RMM

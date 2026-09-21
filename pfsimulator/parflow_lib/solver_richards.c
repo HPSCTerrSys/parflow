@@ -274,6 +274,7 @@ typedef struct {
   int write_netcdf_satur;       /* write saturations? */
   int write_netcdf_evaptrans;   /* write evaptrans? */
   int write_netcdf_evaptrans_sum;       /* write evaptrans_sum? */
+  int write_netcdf_ice_impedance;       /* write soil ice impedance? */
   int write_netcdf_overland_sum;        /* write overland_sum? */
   int write_netcdf_overland_bc_flux;    /* write overland_bc_flux? */
   int write_netcdf_qx_overland;        /* write q_overlnd_x? */
@@ -1095,6 +1096,9 @@ SetupRichards(PFModule * this_module)
     InitVectorAll(instance_xtra->porosity_recv, -9999.0);
     InitVectorAll(instance_xtra->old_porosity_recv, -9999.0);
     InitVectorAll(ProblemDataIceLiqDelta(problem_data), 0.0);
+#ifdef HAVE_ECLM
+    InitVectorAll(ProblemDataIceImpedance(problem_data), 1.0);
+#endif
 #endif
 
     if (public_xtra->evap_trans_file)
@@ -1957,8 +1961,8 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
 #ifdef HAVE_OAS3
   Grid *grid = (instance_xtra->grid);
   Subgrid *subgrid;
-  Subvector *p_sub, *s_sub, *et_sub, *m_sub, *po_sub, *dz_sub, *prcv_sub;
-  double *pp, *sp, *et, *ms, *po_dat, *dz_dat, *prcv_dat;
+  Subvector *p_sub, *s_sub, *et_sub, *m_sub, *po_sub, *dz_sub, *prcv_sub, *iimp_sub;
+  double *pp, *sp, *et, *ms, *po_dat, *dz_dat, *prcv_dat, *iimp_dat;
   double sw_lat = .0;
   double sw_lon = .0;
 #endif
@@ -2164,6 +2168,7 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
       ForSubgridI(is, GridSubgrids(grid))
       {
         int ix, iy, nx, ny, nz, nx_f, ny_f;
+        double dz;
 
         subgrid = GridSubgrid(grid, is);
 
@@ -2171,6 +2176,9 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
         p_sub = VectorSubvector(instance_xtra->pressure, is);
         s_sub = VectorSubvector(instance_xtra->saturation, is);
         et_sub = VectorSubvector(evap_trans, is);
+#ifdef HAVE_ECLM
+        iimp_sub = VectorSubvector(ProblemDataIceImpedance(problem_data), is);
+#endif
         m_sub = VectorSubvector(instance_xtra->mask, is);
         po_sub = VectorSubvector(porosity, is);
         dz_sub = VectorSubvector(instance_xtra->dz_mult, is);
@@ -2181,28 +2189,39 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
         nx = SubgridNX(subgrid);
         ny = SubgridNY(subgrid);
         nz = SubgridNZ(subgrid);
+        dz = SubgridDZ(subgrid);
         nx_f = SubvectorNX(et_sub);
         ny_f = SubvectorNY(et_sub);
-
 
         sp = SubvectorData(s_sub);
         pp = SubvectorData(p_sub);
         et = SubvectorData(et_sub);
+#ifdef HAVE_ECLM
+        iimp_dat = SubvectorData(iimp_sub);
+#endif
         ms = SubvectorData(m_sub);
         po_dat = SubvectorData(po_sub);
         dz_dat = SubvectorData(dz_sub);
         prcv_dat = SubvectorData(prcv_sub);
         //CPS       amps_Printf("Calling oasis send/receive for time  %3.1f \n", t);
         CALL_send_fld2_clm(pp, sp, ms, ix, iy, nx, ny, nz, nx_f, ny_f,
-                           t, po_dat, dz_dat);
+                           t, po_dat, dz_dat, dz);
         amps_Sync(amps_CommWorld);
-        CALL_receive_fld2_clm(et, prcv_dat, ms, ix, iy, nx, ny, nz, nx_f, ny_f, t);
+#ifdef HAVE_ECLM
+        CALL_receive_fld2_clm(et, prcv_dat, iimp_dat, ms, ix, iy, nx, ny, nz, nx_f, ny_f, t);
+#else
+        CALL_receive_fld2_clm(et, ms, ix, iy, nx, ny, nz, nx_f, ny_f, t);
+#endif
       }
       amps_Sync(amps_CommWorld);
       handle = InitVectorUpdate(evap_trans, VectorUpdateAll);
       FinalizeVectorUpdate(handle);
       handle = InitVectorUpdate(instance_xtra->porosity_recv, VectorUpdateAll);
       FinalizeVectorUpdate(handle);
+#ifdef HAVE_ECLM
+      handle = InitVectorUpdate(ProblemDataIceImpedance(problem_data), VectorUpdateAll);
+      FinalizeVectorUpdate(handle);
+#endif
 #endif // end to HAVE_OAS3 CALL
 
       // IMF: Added to include CLM dumps in file_number updating.
@@ -3808,6 +3827,7 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
           || public_xtra->write_netcdf_satur
           || public_xtra->write_netcdf_evaptrans
           || public_xtra->write_netcdf_evaptrans_sum
+          || public_xtra->write_netcdf_ice_impedance
           || public_xtra->write_netcdf_overland_sum
           || public_xtra->write_netcdf_overland_bc_flux)
       {
@@ -4021,6 +4041,16 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
         any_file_dumped = 1;
       }
 
+#ifdef HAVE_ECLM
+      if (public_xtra->write_netcdf_ice_impedance)
+      {
+        sprintf(nc_postfix, "%05d", instance_xtra->file_number);
+        WritePFNC(file_prefix, nc_postfix, t, ProblemDataIceImpedance(problem_data),
+                  public_xtra->numVarTimeVariant, "ice_impedance", 3,
+                  false, public_xtra->numVarIni);
+        any_file_dumped = 1;
+      }
+#endif
 
       if (public_xtra->print_evaptrans_sum
           || public_xtra->write_silo_evaptrans_sum
@@ -5085,6 +5115,15 @@ TeardownRichards(PFModule * this_module)
     int k;
 
     log_file = OpenLogFile("SolverRichards");
+#if defined(HAVE_CLM)
+    fprintf(log_file, "Coupled land surface model: internal CLM\n\n");
+#elif defined(HAVE_ECLM)
+    fprintf(log_file, "Coupled land surface model: eCLM (experimental)\n\n");
+#elif defined(HAVE_OAS3)
+    fprintf(log_file, "Coupled land surface model: CLM3.5\n\n");
+#else
+    fprintf(log_file, "Coupled land surface model: none\n\n");
+#endif
 
     if (start_count >= 0)
     {
@@ -6752,6 +6791,15 @@ SolverRichardsNewPublicXtra(char *name)
   }
   public_xtra->write_netcdf_evaptrans = switch_value;
 
+  sprintf(key, "NetCDF.WriteIceImpedance");
+  switch_name = GetStringDefault(key, "False");
+  switch_value = NA_NameToIndexExitOnError(switch_na, switch_name, key);
+  if (switch_value == 1)
+  {
+    public_xtra->numVarTimeVariant++;
+  }
+  public_xtra->write_netcdf_ice_impedance = switch_value;
+
   sprintf(key, "NetCDF.WriteEvapTransSum");
   switch_name = GetStringDefault(key, "False");
   switch_value = NA_NameToIndexExitOnError(switch_na, switch_name, key);
@@ -6859,6 +6907,7 @@ SolverRichardsNewPublicXtra(char *name)
   if (public_xtra->write_netcdf_press || public_xtra->write_netcdf_satur
       || public_xtra->write_netcdf_evaptrans
       || public_xtra->write_netcdf_evaptrans_sum
+      || public_xtra->write_netcdf_ice_impedance
       || public_xtra->write_netcdf_overland_sum
       || public_xtra->write_netcdf_overland_bc_flux)
 

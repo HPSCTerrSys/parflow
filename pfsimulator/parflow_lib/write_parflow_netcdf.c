@@ -961,6 +961,48 @@ int LookUpInventory(char * varName, varNCData **myVarNCData, int *netCDFIDs)
     return evaptransVarID;
   }
 
+  if (strcmp(varName, "ice_impedance") == 0)
+  {
+    *myVarNCData = malloc(sizeof(varNCData));
+    (*myVarNCData)->varName = varName;
+    (*myVarNCData)->ncType = NC_DOUBLE;
+    (*myVarNCData)->dimSize = 4;
+    (*myVarNCData)->dimIDs = malloc((*myVarNCData)->dimSize * sizeof(int));
+    (*myVarNCData)->dimIDs[0] = netCDFIDs[1];
+    (*myVarNCData)->dimIDs[1] = netCDFIDs[2];
+    (*myVarNCData)->dimIDs[2] = netCDFIDs[3];
+    (*myVarNCData)->dimIDs[3] = netCDFIDs[4];
+    int iceImpedanceVarID;
+    int res = nc_def_var(netCDFIDs[0], varName, (*myVarNCData)->ncType, (*myVarNCData)->dimSize,
+                         (*myVarNCData)->dimIDs, &iceImpedanceVarID);
+    if (res != NC_ENAMEINUSE)
+    {
+      char *switch_name;
+      char key[IDB_MAX_KEY_LEN];
+      char *default_val = "None";
+      sprintf(key, "NetCDF.Chunking");
+      switch_name = GetStringDefault(key, "None");
+      if (strcmp(switch_name, default_val) != 0)
+      {
+        size_t chunksize[(*myVarNCData)->dimSize];
+        chunksize[0] = 1;
+        chunksize[1] = GetInt("NetCDF.ChunkZ");
+        chunksize[2] = GetInt("NetCDF.ChunkY");
+        chunksize[3] = GetInt("NetCDF.ChunkX");
+        nc_def_var_chunking(netCDFIDs[0], iceImpedanceVarID, NC_CHUNKED, chunksize);
+      }
+      if (enable_netcdf_compression) {
+        nc_def_var_deflate(netCDFIDs[0],iceImpedanceVarID,0,1,compression_level);
+      }
+
+    }
+    if (res == NC_ENAMEINUSE)
+    {
+      res = nc_inq_varid(netCDFIDs[0], varName, &iceImpedanceVarID);
+    }
+    return iceImpedanceVarID;
+  }
+
   if (strcmp(varName, "evaptrans_sum") == 0)
   {
     *myVarNCData = (varNCData*)malloc(sizeof(varNCData));

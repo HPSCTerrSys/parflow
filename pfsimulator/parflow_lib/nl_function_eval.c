@@ -245,9 +245,16 @@ void NlFunctionEval(Vector *     pressure, /* Current pressure values */
   double      *z_mult_dat;    //@RMM
 
 /* @RMM Flow Barrier / Boundary values */
+#ifdef HAVE_ECLM
+  /* Soil ice impedance from eCLM replaces the flow barriers */
+  Vector      *FBx = ProblemDataIceImpedance(problem_data);
+  Vector      *FBy = ProblemDataIceImpedance(problem_data);
+  Vector      *FBz = ProblemDataIceImpedance(problem_data);
+#else
   Vector      *FBx = ProblemDataFBx(problem_data);
   Vector      *FBy = ProblemDataFBy(problem_data);
   Vector      *FBz = ProblemDataFBz(problem_data);
+#endif
   Subvector   *FBx_sub, *FBy_sub, *FBz_sub;  //@RMM
   double      *FBx_dat = NULL, *FBy_dat = NULL, *FBz_dat = NULL;   //@RMM
 
