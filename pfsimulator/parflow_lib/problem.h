@@ -155,6 +155,11 @@ typedef struct {
 
   Vector         *porosity;
 
+#ifdef HAVE_OAS3
+  Vector         *old_porosity;       /* porosity used by previous timestep */
+  Vector         *ice_liq_delta;      /* liquid-equivalent volume frozen [-]  */
+#endif
+
   Vector         *specific_storage;   //sk
 
   Vector         *FBx;  //RMM
@@ -288,6 +293,10 @@ typedef struct {
 #define ProblemDataPermeabilityY(problem_data)  ((problem_data)->permeability_y)
 #define ProblemDataPermeabilityZ(problem_data)  ((problem_data)->permeability_z)
 #define ProblemDataPorosity(problem_data)       ((problem_data)->porosity)
+#ifdef HAVE_OAS3
+#define ProblemDataOldPorosity(problem_data)    ((problem_data)->old_porosity)
+#define ProblemDataIceLiqDelta(problem_data)    ((problem_data)->ice_liq_delta)
+#endif
 #define ProblemDataFBx(problem_data)            ((problem_data)->FBx)    //RMM
 #define ProblemDataFBy(problem_data)            ((problem_data)->FBy)    //RMM
 #define ProblemDataFBz(problem_data)            ((problem_data)->FBz)    //RMM

@@ -30,11 +30,14 @@ module oas_pfl_mod
 
   ! Local variables used by OASIS
   integer :: comp_id, rank, ierror
-  integer :: soilliq_id, psi_id, et_id ! coupling field IDs
+  integer :: soilliq_id, psi_id, et_id, eff_porosity_id ! coupling field IDs
 
   ! TODO: Get these values from eCLM instead of hardcoding it here
   integer :: nlevsoi  = 20 ! Number of hydrologically active soil layers in eCLM
   integer :: nlevgrnd = 25 ! Total number of soil layers in eCLM
+
+  ! Marks a cell eCLM does not couple. Must match pfl_uncoupled in eCLM's lnd2atmMod.F90
+  real(kind=8), parameter, public :: PFL_UNCOUPLED = -9999.d0
 
 contains
 
@@ -116,6 +119,8 @@ contains
     if (ierror /= 0) call oasis_abort(comp_id, 'oas_pfl_define', 'oasis_def_var failed for PFL_PSI')
     call oasis_def_var (soilliq_id, "PFL_SOILLIQ", part_id, var_nodims, OASIS_Out, OASIS_Real, ierror)
     if (ierror /= 0) call oasis_abort(comp_id, 'oas_pfl_define', 'oasis_def_var failed for PFL_SOILLIQ')
+    call oasis_def_var (eff_porosity_id, "PFL_EFFPOROSITY", part_id, var_nodims, OASIS_In, OASIS_Real, ierror)
+    if (ierror /= 0) call oasis_abort(comp_id, 'oas_pfl_define', 'oasis_def_var failed for PFL_EFFPOROSITY')
 
     call oasis_enddef ( ierror )
     if (ierror /= 0) call oasis_abort (comp_id, 'oas_pfl_define', 'oasis_enddef failed')
@@ -176,16 +181,19 @@ contains
     deallocate(pressure_3d)
   end subroutine send_fld2_clm
 
-  subroutine receive_fld2_clm(evap_trans, topo, ix, iy, nx, ny, nz, nx_f, ny_f, pstep) bind(c, name='receive_fld2_clm_')
-    !-----------------------------------------------
-    ! Receives evapotranspiration fluxes from eCLM.
-    !-----------------------------------------------
+  subroutine receive_fld2_clm(evap_trans, porosity_recv, topo, ix, iy, nx, ny, nz, nx_f, ny_f, pstep) bind(c, name='receive_fld2_clm_')
+    !-------------------------------------------------------------------------
+    ! Receives evapotranspiration fluxes and effective porosity from eCLM.
+    !
+    ! ParFlow ownly keep own porosity, where eCLM is not coupled (PFL_UNCOUPLED).
+    !-------------------------------------------------------------------------
     integer,      intent(in)    :: ix, iy,                        & ! starting coordinate of the subgrid (UNUSED)
                                    nx, ny, nz,                    & ! subgrid dimensions
                                    nx_f, ny_f                       ! dimensions of ET subvector
     real(kind=8), intent(in)    :: pstep,                         & ! current model time in hours
                                    topo((nx+2)*(ny+2)*(nz+2))       ! topography mask (0 for inactive, 1 for active)
-    real(kind=8), intent(inout) :: evap_trans((nx+2)*(ny+2)*(nz+2)) ! evapotranspiration [1/hrs]
+    real(kind=8), intent(inout) :: evap_trans((nx+2)*(ny+2)*(nz+2)), & ! evapotranspiration [1/hrs]
+                                   porosity_recv((nx+2)*(ny+2)*(nz+2)) ! effective porosity from eCLM [m3/m3]
                                                                     ! (nx+2)*(ny+2)*(nz+2) = total number of subgrid cells; the
                                                                     !  extra "+2" terms account for the ghost nodes/halo points
 
@@ -196,14 +204,18 @@ contains
     integer                     :: z                                ! subsurface level (z=nz topmost layer, z=1 deepest layer)
     integer                     :: top_z_level(nx,ny)               ! topmost z level of active ParFlow cells
     real(kind=8), allocatable   :: evap_trans_3d(:,:,:)             ! Root ET fluxes received from eCLM [1/hrs]
+    real(kind=8), allocatable   :: porosity_3d(:,:,:)               ! Effective porosity received from eCLM [m3/m3]
 
-    ! Receive ET fluxes from eCLM
+    ! Receive ET fluxes and effective porosity from eCLM
     allocate(evap_trans_3d(nx,ny,nlevsoi))
+    allocate(porosity_3d(nx,ny,nlevgrnd))
     seconds_elapsed = nint(pstep*3600.d0)
     call oasis_get(et_id, seconds_elapsed, evap_trans_3d, ierror)
+    call oasis_get(eff_porosity_id, seconds_elapsed, porosity_3d, ierror)
 
-    ! Save ET fluxes to ParFlow evap_trans vector
+    ! Save the received fields to the ParFlow vectors
     evap_trans = 0.
+    porosity_recv = PFL_UNCOUPLED
     top_z_level = get_top_z_level(nx, ny, nz, topo)
     do i = 1, nx
       do j = 1, ny
@@ -213,10 +225,17 @@ contains
             l = flattened_array_index(i, j, z, nx_f, ny_f)
             evap_trans(l) = evap_trans_3d(i,j,k)
           end do
+          do k = 1, nlevgrnd
+            z = top_z_level(i,j) - (k-1)
+            if (z < 1) exit               ! eCLM column reaches deeper than ParFlow
+            l = flattened_array_index(i, j, z, nx_f, ny_f)
+            porosity_recv(l) = porosity_3d(i,j,k)
+          end do
         end if
       end do
     end do
 
+    deallocate(porosity_3d)
     deallocate(evap_trans_3d)
   end subroutine receive_fld2_clm
 

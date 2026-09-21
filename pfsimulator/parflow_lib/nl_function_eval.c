@@ -221,6 +221,10 @@ void NlFunctionEval(Vector *     pressure, /* Current pressure values */
   double      *q_overlnd_x_ = NULL, *q_overlnd_y_ = NULL;
 
   Vector      *porosity = ProblemDataPorosity(problem_data);
+#ifdef HAVE_OAS3
+  Vector      *old_porosity = ProblemDataOldPorosity(problem_data);
+  Vector      *ice_liq_delta = ProblemDataIceLiqDelta(problem_data);
+#endif
   Vector      *permeability_x = ProblemDataPermeabilityX(problem_data);
   Vector      *permeability_y = ProblemDataPermeabilityY(problem_data);
   Vector      *permeability_z = ProblemDataPermeabilityZ(problem_data);
@@ -258,12 +262,18 @@ void NlFunctionEval(Vector *     pressure, /* Current pressure values */
   Subgrid     *subgrid;
 
   Subvector   *p_sub, *d_sub, *od_sub, *s_sub, *os_sub, *po_sub, *op_sub, *ss_sub, *et_sub;
+#ifdef HAVE_OAS3
+  Subvector   *opo_sub, *ild_sub;
+#endif
   Subvector   *f_sub, *rp_sub, *permx_sub, *permy_sub, *permz_sub;
 
   Grid        *grid = VectorGrid(pressure);
   Grid        *grid2d = VectorGrid(x_sl);
 
   double      *pp, *odp, *sp, *osp, *pop, *fp, *dp, *rpp, *opp, *ss, *et;
+#ifdef HAVE_OAS3
+  double      *opop, *ildp;
+#endif
   double      *permxp, *permyp, *permzp;
 
   // Velocity data jjb
@@ -338,6 +348,10 @@ void NlFunctionEval(Vector *     pressure, /* Current pressure values */
     s_sub = VectorSubvector(saturation, is);
     os_sub = VectorSubvector(old_saturation, is);
     po_sub = VectorSubvector(porosity, is);
+#ifdef HAVE_OAS3
+    opo_sub = VectorSubvector(old_porosity, is);
+    ild_sub = VectorSubvector(ice_liq_delta, is);
+#endif
     f_sub = VectorSubvector(fval, is);
 
     /* @RMM added to provide access to zmult */
@@ -389,6 +403,10 @@ void NlFunctionEval(Vector *     pressure, /* Current pressure values */
     opp = SubvectorData(op_sub);
     osp = SubvectorData(os_sub);
     pop = SubvectorData(po_sub);
+#ifdef HAVE_OAS3
+    opop = SubvectorData(opo_sub);
+    ildp = SubvectorData(ild_sub);
+#endif
     fp = SubvectorData(f_sub);
 
     GrGeomInLoop(i, j, k, gr_domain, r, ix, iy, iz, nx, ny, nz,
@@ -401,7 +419,14 @@ void NlFunctionEval(Vector *     pressure, /* Current pressure values */
       double del_x_slope = 1.0;
       double del_y_slope = 1.0;
 
+#ifdef HAVE_OAS3
+      /* Porosity varies over time, so storage terms cannot be factored.
+       * Ice_liq_delta is here to avoid double-counting on solver retries. */
+      fp[ip] = (sp[ip] * dp[ip] * pop[ipo] - osp[ip] * odp[ip] * opop[ipo]
+                + ildp[ipo] * dp[ip]) * vol * del_x_slope * del_y_slope * z_mult_dat[ip];
+#else
       fp[ip] = (sp[ip] * dp[ip] - osp[ip] * odp[ip]) * pop[ipo] * vol * del_x_slope * del_y_slope * z_mult_dat[ip];
+#endif
     });
   }
 

@@ -331,6 +331,10 @@ typedef struct {
   Vector *mask;
 
   Vector *evap_trans;           /* sk: Vector that contains the sink terms from the land surface model */
+#ifdef HAVE_OAS3
+  Vector *porosity_recv;        /* effective porosity received from eCLM; 0 = uncoupled cell */
+  Vector *old_porosity_recv;    /* effective porosity at the previous coupling step */
+#endif
   Vector *evap_trans_sum;       /* running sum of evaporation and transpiration */
   Vector *overland_sum;
   Vector *ovrl_bc_flx;          /* vector containing outflow at the boundary */
@@ -549,6 +553,10 @@ SetupRichards(PFModule * this_module)
 
   /* Do turning bands (and other stuff maybe) */
   PFModuleInvokeType(SetProblemDataInvoke, set_problem_data, (problem_data));
+#ifdef HAVE_OAS3
+  /* Init with no porosity change (first coupled step carries no freeze term) */
+  PFVCopy(ProblemDataPorosity(problem_data), ProblemDataOldPorosity(problem_data));
+#endif
   ComputeTopAndBottom(problem, problem_data);
 
   if (public_xtra->print_top || public_xtra->write_silo_top)
@@ -1079,6 +1087,15 @@ SetupRichards(PFModule * this_module)
     /*sk Initialize LSM terms */
     instance_xtra->evap_trans = NewVectorType(grid, 1, 1, vector_cell_centered);
     InitVectorAll(instance_xtra->evap_trans, 0.0);
+
+#ifdef HAVE_OAS3
+    instance_xtra->porosity_recv = NewVectorType(grid, 1, 1, vector_cell_centered);
+    instance_xtra->old_porosity_recv = NewVectorType(grid, 1, 1, vector_cell_centered);
+    /* Must match PFL_UNCOUPLED in oas_pfl_mod.F90 */
+    InitVectorAll(instance_xtra->porosity_recv, -9999.0);
+    InitVectorAll(instance_xtra->old_porosity_recv, -9999.0);
+    InitVectorAll(ProblemDataIceLiqDelta(problem_data), 0.0);
+#endif
 
     if (public_xtra->evap_trans_file)
     {
@@ -1940,8 +1957,8 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
 #ifdef HAVE_OAS3
   Grid *grid = (instance_xtra->grid);
   Subgrid *subgrid;
-  Subvector *p_sub, *s_sub, *et_sub, *m_sub, *po_sub, *dz_sub;
-  double *pp, *sp, *et, *ms, *po_dat, *dz_dat;
+  Subvector *p_sub, *s_sub, *et_sub, *m_sub, *po_sub, *dz_sub, *prcv_sub;
+  double *pp, *sp, *et, *ms, *po_dat, *dz_dat, *prcv_dat;
   double sw_lat = .0;
   double sw_lon = .0;
 #endif
@@ -2157,6 +2174,7 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
         m_sub = VectorSubvector(instance_xtra->mask, is);
         po_sub = VectorSubvector(porosity, is);
         dz_sub = VectorSubvector(instance_xtra->dz_mult, is);
+        prcv_sub = VectorSubvector(instance_xtra->porosity_recv, is);
 
         ix = SubgridIX(subgrid);
         iy = SubgridIY(subgrid);
@@ -2173,14 +2191,17 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
         ms = SubvectorData(m_sub);
         po_dat = SubvectorData(po_sub);
         dz_dat = SubvectorData(dz_sub);
+        prcv_dat = SubvectorData(prcv_sub);
         //CPS       amps_Printf("Calling oasis send/receive for time  %3.1f \n", t);
         CALL_send_fld2_clm(pp, sp, ms, ix, iy, nx, ny, nz, nx_f, ny_f,
                            t, po_dat, dz_dat);
         amps_Sync(amps_CommWorld);
-        CALL_receive_fld2_clm(et, ms, ix, iy, nx, ny, nz, nx_f, ny_f, t);
+        CALL_receive_fld2_clm(et, prcv_dat, ms, ix, iy, nx, ny, nz, nx_f, ny_f, t);
       }
       amps_Sync(amps_CommWorld);
       handle = InitVectorUpdate(evap_trans, VectorUpdateAll);
+      FinalizeVectorUpdate(handle);
+      handle = InitVectorUpdate(instance_xtra->porosity_recv, VectorUpdateAll);
       FinalizeVectorUpdate(handle);
 #endif // end to HAVE_OAS3 CALL
 
@@ -2993,10 +3014,86 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
                               problem_data));
         }
 
+#ifdef HAVE_OAS3
+        PFVCopy(porosity, ProblemDataOldPorosity(problem_data));
+#endif
         PFVCopy(instance_xtra->density, instance_xtra->old_density);
         PFVCopy(instance_xtra->saturation,
                 instance_xtra->old_saturation);
         PFVCopy(instance_xtra->pressure, instance_xtra->old_pressure);
+
+#ifdef HAVE_OAS3
+        /* Implement the effective porosity from eCLM. Cells eCLM does not couple keep
+         * the porosity ParFlow read from its own input. */
+        {
+          GrGeomSolid *gr_domain = ProblemDataGrDomain(problem_data);
+          Vector *old_porosity = ProblemDataOldPorosity(problem_data);
+          Vector *ice_liq_delta = ProblemDataIceLiqDelta(problem_data);
+          Subvector *po_s, *opo_s, *ild_s, *os_s, *rcv_s, *orcv_s;
+          double *po_d, *opo_d, *ild_d, *os_d, *rcv_d, *orcv_d;
+          Subgrid *sg;
+          int i, j, k, r, is;
+          int ix, iy, iz, nx, ny, nz;
+
+          /* Ice occupies h2osoi_ice/denice of pore volume but removes only
+           * h2osoi_ice/denh2o of liquid. */
+          const double ice_water_ratio = 0.917;
+          const double porosity_min = 0.01;
+          /* Threshold for non-coupled values, needs to be out of physical range */
+          const double coupled_min = -1000.0;
+
+          ForSubgridI(is, GridSubgrids(grid))
+          {
+            sg = GridSubgrid(grid, is);
+
+            po_s = VectorSubvector(porosity, is);
+            opo_s = VectorSubvector(old_porosity, is);
+            ild_s = VectorSubvector(ice_liq_delta, is);
+            os_s = VectorSubvector(instance_xtra->old_saturation, is);
+            rcv_s = VectorSubvector(instance_xtra->porosity_recv, is);
+            orcv_s = VectorSubvector(instance_xtra->old_porosity_recv, is);
+
+            po_d = SubvectorData(po_s);
+            opo_d = SubvectorData(opo_s);
+            ild_d = SubvectorData(ild_s);
+            os_d = SubvectorData(os_s);
+            rcv_d = SubvectorData(rcv_s);
+            orcv_d = SubvectorData(orcv_s);
+
+            r = SubgridRX(sg);
+            ix = SubgridIX(sg); iy = SubgridIY(sg); iz = SubgridIZ(sg);
+            nx = SubgridNX(sg); ny = SubgridNY(sg); nz = SubgridNZ(sg);
+
+            GrGeomInLoop(i, j, k, gr_domain, r, ix, iy, iz, nx, ny, nz,
+            {
+              int ipo = SubvectorEltIndex(po_s, i, j, k);
+              int is_ = SubvectorEltIndex(os_s, i, j, k);
+
+              if (rcv_d[ipo] > coupled_min)
+              {
+                /* No previous value means a fresh start or a restart: skip the freeze. */
+                ild_d[ipo] = (orcv_d[ipo] > coupled_min)
+                             ? (orcv_d[ipo] - rcv_d[ipo]) * ice_water_ratio
+                             : 0.0;
+
+                /* Cap the pore-space loss at the liquid left, so ice expansion cannot
+                 * demand a saturation above one. Releases once the cell has drained. */
+                double liq_target = opo_d[ipo] * os_d[is_] - ild_d[ipo];
+                po_d[ipo] = pfmax(pfmax(rcv_d[ipo], liq_target), porosity_min);
+              }
+              else
+              {
+                ild_d[ipo] = 0.0;
+              }
+            });
+          }
+
+          PFVCopy(instance_xtra->porosity_recv, instance_xtra->old_porosity_recv);
+
+          handle = InitVectorUpdate(porosity, VectorUpdateAll);
+          FinalizeVectorUpdate(handle);
+        }
+#endif
       }
       else                      /* Not converged, so decrease time step */
       {
@@ -4904,6 +5001,10 @@ TeardownRichards(PFModule * this_module)
 
   FreeVector(instance_xtra->q_overlnd_y);
   FreeVector(instance_xtra->evap_trans);
+#ifdef HAVE_OAS3
+  FreeVector(instance_xtra->porosity_recv);
+  FreeVector(instance_xtra->old_porosity_recv);
+#endif
 
   FreeVector(instance_xtra->evap_trans_sum);
   FreeVector(instance_xtra->overland_sum);
