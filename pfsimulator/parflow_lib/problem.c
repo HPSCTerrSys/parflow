@@ -457,11 +457,9 @@ ProblemData   *NewProblemData(
 
   ProblemDataPorosity(problem_data) = NewVectorType(grid, 1, 1, vector_cell_centered);
 
-#ifdef HAVE_OAS3
+#ifdef HAVE_ECLM
   ProblemDataOldPorosity(problem_data) = NewVectorType(grid, 1, 1, vector_cell_centered);
   ProblemDataIceLiqDelta(problem_data) = NewVectorType(grid, 1, 1, vector_cell_centered);
-#endif
-#ifdef HAVE_ECLM
   ProblemDataIceImpedance(problem_data) = NewVectorType(grid, 1, 1, vector_cell_centered);
 #endif
 
@@ -498,11 +496,9 @@ void          FreeProblemData(
     FreeReservoirData(ProblemDataReservoirData(problem_data));
     FreeBCPressureData(ProblemDataBCPressureData(problem_data));
     FreeVector(ProblemDataPorosity(problem_data));
-#ifdef HAVE_OAS3
+#ifdef HAVE_ECLM
     FreeVector(ProblemDataOldPorosity(problem_data));
     FreeVector(ProblemDataIceLiqDelta(problem_data));
-#endif
-#ifdef HAVE_ECLM
     FreeVector(ProblemDataIceImpedance(problem_data));
 #endif
     FreeVector(ProblemDataPermeabilityX(problem_data));

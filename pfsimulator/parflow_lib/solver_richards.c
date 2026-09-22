@@ -332,7 +332,7 @@ typedef struct {
   Vector *mask;
 
   Vector *evap_trans;           /* sk: Vector that contains the sink terms from the land surface model */
-#ifdef HAVE_OAS3
+#ifdef HAVE_ECLM
   Vector *porosity_recv;        /* effective porosity received from eCLM; 0 = uncoupled cell */
   Vector *old_porosity_recv;    /* effective porosity at the previous coupling step */
 #endif
@@ -554,7 +554,7 @@ SetupRichards(PFModule * this_module)
 
   /* Do turning bands (and other stuff maybe) */
   PFModuleInvokeType(SetProblemDataInvoke, set_problem_data, (problem_data));
-#ifdef HAVE_OAS3
+#ifdef HAVE_ECLM
   /* Init with no porosity change (first coupled step carries no freeze term) */
   PFVCopy(ProblemDataPorosity(problem_data), ProblemDataOldPorosity(problem_data));
 #endif
@@ -1089,16 +1089,14 @@ SetupRichards(PFModule * this_module)
     instance_xtra->evap_trans = NewVectorType(grid, 1, 1, vector_cell_centered);
     InitVectorAll(instance_xtra->evap_trans, 0.0);
 
-#ifdef HAVE_OAS3
+#ifdef HAVE_ECLM
     instance_xtra->porosity_recv = NewVectorType(grid, 1, 1, vector_cell_centered);
     instance_xtra->old_porosity_recv = NewVectorType(grid, 1, 1, vector_cell_centered);
     /* Must match PFL_UNCOUPLED in oas_pfl_mod.F90 */
     InitVectorAll(instance_xtra->porosity_recv, -9999.0);
     InitVectorAll(instance_xtra->old_porosity_recv, -9999.0);
     InitVectorAll(ProblemDataIceLiqDelta(problem_data), 0.0);
-#ifdef HAVE_ECLM
     InitVectorAll(ProblemDataIceImpedance(problem_data), 1.0);
-#endif
 #endif
 
     if (public_xtra->evap_trans_file)
@@ -1961,8 +1959,12 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
 #ifdef HAVE_OAS3
   Grid *grid = (instance_xtra->grid);
   Subgrid *subgrid;
-  Subvector *p_sub, *s_sub, *et_sub, *m_sub, *po_sub, *dz_sub, *prcv_sub, *iimp_sub;
-  double *pp, *sp, *et, *ms, *po_dat, *dz_dat, *prcv_dat, *iimp_dat;
+  Subvector *p_sub, *s_sub, *et_sub, *m_sub, *po_sub, *dz_sub;
+  double *pp, *sp, *et, *ms, *po_dat, *dz_dat;
+#ifdef HAVE_ECLM
+  Subvector *prcv_sub, *iimp_sub;
+  double *prcv_dat, *iimp_dat;
+#endif
   double sw_lat = .0;
   double sw_lon = .0;
 #endif
@@ -2176,13 +2178,13 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
         p_sub = VectorSubvector(instance_xtra->pressure, is);
         s_sub = VectorSubvector(instance_xtra->saturation, is);
         et_sub = VectorSubvector(evap_trans, is);
-#ifdef HAVE_ECLM
-        iimp_sub = VectorSubvector(ProblemDataIceImpedance(problem_data), is);
-#endif
         m_sub = VectorSubvector(instance_xtra->mask, is);
         po_sub = VectorSubvector(porosity, is);
         dz_sub = VectorSubvector(instance_xtra->dz_mult, is);
+#ifdef HAVE_ECLM
         prcv_sub = VectorSubvector(instance_xtra->porosity_recv, is);
+        iimp_sub = VectorSubvector(ProblemDataIceImpedance(problem_data), is);
+#endif
 
         ix = SubgridIX(subgrid);
         iy = SubgridIY(subgrid);
@@ -2196,13 +2198,13 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
         sp = SubvectorData(s_sub);
         pp = SubvectorData(p_sub);
         et = SubvectorData(et_sub);
-#ifdef HAVE_ECLM
-        iimp_dat = SubvectorData(iimp_sub);
-#endif
         ms = SubvectorData(m_sub);
         po_dat = SubvectorData(po_sub);
         dz_dat = SubvectorData(dz_sub);
+#ifdef HAVE_ECLM
         prcv_dat = SubvectorData(prcv_sub);
+        iimp_dat = SubvectorData(iimp_sub);
+#endif
         //CPS       amps_Printf("Calling oasis send/receive for time  %3.1f \n", t);
         CALL_send_fld2_clm(pp, sp, ms, ix, iy, nx, ny, nz, nx_f, ny_f,
                            t, po_dat, dz_dat, dz);
@@ -2216,9 +2218,9 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
       amps_Sync(amps_CommWorld);
       handle = InitVectorUpdate(evap_trans, VectorUpdateAll);
       FinalizeVectorUpdate(handle);
+#ifdef HAVE_ECLM
       handle = InitVectorUpdate(instance_xtra->porosity_recv, VectorUpdateAll);
       FinalizeVectorUpdate(handle);
-#ifdef HAVE_ECLM
       handle = InitVectorUpdate(ProblemDataIceImpedance(problem_data), VectorUpdateAll);
       FinalizeVectorUpdate(handle);
 #endif
@@ -3033,7 +3035,7 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
                               problem_data));
         }
 
-#ifdef HAVE_OAS3
+#ifdef HAVE_ECLM
         PFVCopy(porosity, ProblemDataOldPorosity(problem_data));
 #endif
         PFVCopy(instance_xtra->density, instance_xtra->old_density);
@@ -3041,7 +3043,7 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
                 instance_xtra->old_saturation);
         PFVCopy(instance_xtra->pressure, instance_xtra->old_pressure);
 
-#ifdef HAVE_OAS3
+#ifdef HAVE_ECLM
         /* Implement the effective porosity from eCLM. Cells eCLM does not couple keep
          * the porosity ParFlow read from its own input. */
         {
@@ -5031,7 +5033,7 @@ TeardownRichards(PFModule * this_module)
 
   FreeVector(instance_xtra->q_overlnd_y);
   FreeVector(instance_xtra->evap_trans);
-#ifdef HAVE_OAS3
+#ifdef HAVE_ECLM
   FreeVector(instance_xtra->porosity_recv);
   FreeVector(instance_xtra->old_porosity_recv);
 #endif

@@ -221,7 +221,7 @@ void NlFunctionEval(Vector *     pressure, /* Current pressure values */
   double      *q_overlnd_x_ = NULL, *q_overlnd_y_ = NULL;
 
   Vector      *porosity = ProblemDataPorosity(problem_data);
-#ifdef HAVE_OAS3
+#ifdef HAVE_ECLM
   Vector      *old_porosity = ProblemDataOldPorosity(problem_data);
   Vector      *ice_liq_delta = ProblemDataIceLiqDelta(problem_data);
 #endif
@@ -269,7 +269,7 @@ void NlFunctionEval(Vector *     pressure, /* Current pressure values */
   Subgrid     *subgrid;
 
   Subvector   *p_sub, *d_sub, *od_sub, *s_sub, *os_sub, *po_sub, *op_sub, *ss_sub, *et_sub;
-#ifdef HAVE_OAS3
+#ifdef HAVE_ECLM
   Subvector   *opo_sub, *ild_sub;
 #endif
   Subvector   *f_sub, *rp_sub, *permx_sub, *permy_sub, *permz_sub;
@@ -278,7 +278,7 @@ void NlFunctionEval(Vector *     pressure, /* Current pressure values */
   Grid        *grid2d = VectorGrid(x_sl);
 
   double      *pp, *odp, *sp, *osp, *pop, *fp, *dp, *rpp, *opp, *ss, *et;
-#ifdef HAVE_OAS3
+#ifdef HAVE_ECLM
   double      *opop, *ildp;
 #endif
   double      *permxp, *permyp, *permzp;
@@ -355,7 +355,7 @@ void NlFunctionEval(Vector *     pressure, /* Current pressure values */
     s_sub = VectorSubvector(saturation, is);
     os_sub = VectorSubvector(old_saturation, is);
     po_sub = VectorSubvector(porosity, is);
-#ifdef HAVE_OAS3
+#ifdef HAVE_ECLM
     opo_sub = VectorSubvector(old_porosity, is);
     ild_sub = VectorSubvector(ice_liq_delta, is);
 #endif
@@ -410,7 +410,7 @@ void NlFunctionEval(Vector *     pressure, /* Current pressure values */
     opp = SubvectorData(op_sub);
     osp = SubvectorData(os_sub);
     pop = SubvectorData(po_sub);
-#ifdef HAVE_OAS3
+#ifdef HAVE_ECLM
     opop = SubvectorData(opo_sub);
     ildp = SubvectorData(ild_sub);
 #endif
@@ -426,7 +426,7 @@ void NlFunctionEval(Vector *     pressure, /* Current pressure values */
       double del_x_slope = 1.0;
       double del_y_slope = 1.0;
 
-#ifdef HAVE_OAS3
+#ifdef HAVE_ECLM
       /* Porosity varies over time, so storage terms cannot be factored.
        * Ice_liq_delta is here to avoid double-counting on solver retries. */
       fp[ip] = (sp[ip] * dp[ip] * pop[ipo] - osp[ip] * odp[ip] * opop[ipo]
