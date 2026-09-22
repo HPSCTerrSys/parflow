@@ -245,15 +245,16 @@ void NlFunctionEval(Vector *     pressure, /* Current pressure values */
   double      *z_mult_dat;    //@RMM
 
 /* @RMM Flow Barrier / Boundary values */
-#ifdef HAVE_ECLM
-  /* Soil ice impedance from eCLM replaces the flow barriers */
-  Vector      *FBx = ProblemDataIceImpedance(problem_data);
-  Vector      *FBy = ProblemDataIceImpedance(problem_data);
-  Vector      *FBz = ProblemDataIceImpedance(problem_data);
-#else
   Vector      *FBx = ProblemDataFBx(problem_data);
   Vector      *FBy = ProblemDataFBy(problem_data);
   Vector      *FBz = ProblemDataFBz(problem_data);
+#ifdef HAVE_ECLM
+  /* Soil ice impedance, applied on top of the flow barriers */
+  Vector      *IIx = ProblemDataIceImpedanceX(problem_data);
+  Vector      *IIy = ProblemDataIceImpedanceY(problem_data);
+  Vector      *IIz = ProblemDataIceImpedanceZ(problem_data);
+  Subvector   *IIx_sub, *IIy_sub, *IIz_sub;
+  double      *IIx_dat, *IIy_dat, *IIz_dat;
 #endif
   Subvector   *FBx_sub, *FBy_sub, *FBz_sub;  //@RMM
   double      *FBx_dat = NULL, *FBy_dat = NULL, *FBz_dat = NULL;   //@RMM
@@ -558,6 +559,14 @@ void NlFunctionEval(Vector *     pressure, /* Current pressure values */
     FBx_dat = SubvectorData(FBx_sub);
     FBy_dat = SubvectorData(FBy_sub);
     FBz_dat = SubvectorData(FBz_sub);
+#ifdef HAVE_ECLM
+    IIx_sub = VectorSubvector(IIx, is);
+    IIy_sub = VectorSubvector(IIy, is);
+    IIz_sub = VectorSubvector(IIz, is);
+    IIx_dat = SubvectorData(IIx_sub);
+    IIy_dat = SubvectorData(IIy_sub);
+    IIz_dat = SubvectorData(IIz_sub);
+#endif
 
     GrGeomInLoop(i, j, k, gr_domain, r, ix, iy, iz, nx, ny, nz,
     {
@@ -873,6 +882,11 @@ void NlFunctionEval(Vector *     pressure, /* Current pressure values */
       u_right = u_right * FBx_dat[ip];
       u_front = u_front * FBy_dat[ip];
       u_upper = u_upper * FBz_dat[ip];
+#ifdef HAVE_ECLM
+      u_right = u_right * IIx_dat[ip];
+      u_front = u_front * IIy_dat[ip];
+      u_upper = u_upper * IIz_dat[ip];
+#endif
 
       /* velocity data jjb */
       vx[vxi] = u_right / (ffx * z_mult_dat[ip] * del_y_slope);

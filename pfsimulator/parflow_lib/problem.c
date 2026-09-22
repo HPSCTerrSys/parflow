@@ -460,7 +460,10 @@ ProblemData   *NewProblemData(
 #ifdef HAVE_ECLM
   ProblemDataOldPorosity(problem_data) = NewVectorType(grid, 1, 1, vector_cell_centered);
   ProblemDataIceLiqDelta(problem_data) = NewVectorType(grid, 1, 1, vector_cell_centered);
-  ProblemDataIceImpedance(problem_data) = NewVectorType(grid, 1, 1, vector_cell_centered);
+  ProblemDataStaticPorosity(problem_data) = NewVectorType(grid, 1, 1, vector_cell_centered);
+  ProblemDataIceImpedanceX(problem_data) = NewVectorType(grid, 1, 1, vector_cell_centered);
+  ProblemDataIceImpedanceY(problem_data) = NewVectorType(grid, 1, 1, vector_cell_centered);
+  ProblemDataIceImpedanceZ(problem_data) = NewVectorType(grid, 1, 1, vector_cell_centered);
 #endif
 
   ProblemDataBCPressureData(problem_data) = NewBCPressureData();
@@ -499,7 +502,10 @@ void          FreeProblemData(
 #ifdef HAVE_ECLM
     FreeVector(ProblemDataOldPorosity(problem_data));
     FreeVector(ProblemDataIceLiqDelta(problem_data));
-    FreeVector(ProblemDataIceImpedance(problem_data));
+    FreeVector(ProblemDataStaticPorosity(problem_data));
+    FreeVector(ProblemDataIceImpedanceX(problem_data));
+    FreeVector(ProblemDataIceImpedanceY(problem_data));
+    FreeVector(ProblemDataIceImpedanceZ(problem_data));
 #endif
     FreeVector(ProblemDataPermeabilityX(problem_data));
     FreeVector(ProblemDataPermeabilityY(problem_data));

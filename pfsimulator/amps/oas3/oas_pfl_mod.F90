@@ -30,7 +30,7 @@ module oas_pfl_mod
 
   ! Local variables used by OASIS
   integer :: comp_id, rank, ierror
-  integer :: soilliq_id, psi_id, et_id, eff_porosity_id, ice_impedance_id ! coupling field IDs
+  integer :: soilliq_id, psi_id, et_id, eff_porosity_id ! coupling field IDs
 
   ! TODO: Get these values from eCLM instead of hardcoding it here
   integer :: nlevsoi  = 20 ! Number of hydrologically active soil layers in eCLM
@@ -121,8 +121,6 @@ contains
     if (ierror /= 0) call oasis_abort(comp_id, 'oas_pfl_define', 'oasis_def_var failed for PFL_SOILLIQ')
     call oasis_def_var (eff_porosity_id, "PFL_EFFPOROSITY", part_id, var_nodims, OASIS_In, OASIS_Real, ierror)
     if (ierror /= 0) call oasis_abort(comp_id, 'oas_pfl_define', 'oasis_def_var failed for PFL_EFFPOROSITY')
-    call oasis_def_var (ice_impedance_id, "PFL_ICE_IMPEDANCE", part_id, var_nodims, OASIS_In, OASIS_Real, ierror)
-    if (ierror /= 0) call oasis_abort(comp_id, 'oas_pfl_define', 'oasis_def_var failed for PFL_ICE_IMPEDANCE')
 
     call oasis_enddef ( ierror )
     if (ierror /= 0) call oasis_abort (comp_id, 'oas_pfl_define', 'oasis_enddef failed')
@@ -184,10 +182,9 @@ contains
     deallocate(pressure_3d)
   end subroutine send_fld2_clm
 
-  subroutine receive_fld2_clm(evap_trans, porosity_recv, ice_impedance, topo, ix, iy, nx, ny, nz, nx_f, ny_f, pstep) bind(c, name='receive_fld2_clm_')
+  subroutine receive_fld2_clm(evap_trans, porosity_recv, topo, ix, iy, nx, ny, nz, nx_f, ny_f, pstep) bind(c, name='receive_fld2_clm_')
     !-------------------------------------------------------------------------
-    ! Receives evapotranspiration fluxes, effective porosity and soil ice
-    ! impedance from eCLM.
+    ! Receives evapotranspiration fluxes and effective porosity from eCLM.
     !
     ! ParFlow ownly keep own porosity, where eCLM is not coupled (PFL_UNCOUPLED).
     !-------------------------------------------------------------------------
@@ -197,8 +194,7 @@ contains
     real(kind=8), intent(in)    :: pstep,                         & ! current model time in hours
                                    topo((nx+2)*(ny+2)*(nz+2))       ! topography mask (0 for inactive, 1 for active)
     real(kind=8), intent(inout) :: evap_trans((nx+2)*(ny+2)*(nz+2)), & ! evapotranspiration [1/hrs]
-                                   porosity_recv((nx+2)*(ny+2)*(nz+2)), & ! effective porosity from eCLM [m3/m3]
-                                   ice_impedance((nx+2)*(ny+2)*(nz+2))  ! soil ice impedance [-]
+                                   porosity_recv((nx+2)*(ny+2)*(nz+2)) ! effective porosity from eCLM [m3/m3]
                                                                     ! (nx+2)*(ny+2)*(nz+2) = total number of subgrid cells; the
                                                                     !  extra "+2" terms account for the ghost nodes/halo points
 
@@ -210,30 +206,25 @@ contains
     integer                     :: top_z_level(nx,ny)               ! topmost z level of active ParFlow cells
     real(kind=8), allocatable   :: evap_trans_3d(:,:,:)             ! Root ET fluxes received from eCLM [1/hrs]
     real(kind=8), allocatable   :: porosity_3d(:,:,:)               ! Effective porosity received from eCLM [m3/m3]
-    real(kind=8), allocatable   :: ice_impedance_3d(:,:,:)          ! Soil ice impedance received from eCLM [unitless; values from 0 to 1]
 
     ! Receive ET fluxes and effective porosity from eCLM
     allocate(evap_trans_3d(nx,ny,nlevsoi))
     allocate(porosity_3d(nx,ny,nlevgrnd))
-    allocate(ice_impedance_3d(nx,ny,nlevgrnd))
     seconds_elapsed = nint(pstep*3600.d0)
     call oasis_get(et_id, seconds_elapsed, evap_trans_3d, ierror)
     call oasis_get(eff_porosity_id, seconds_elapsed, porosity_3d, ierror)
-    call oasis_get(ice_impedance_id, seconds_elapsed, ice_impedance_3d, ierror)
 
     ! Save the received fields to the ParFlow vectors
     evap_trans = 0.
     porosity_recv = PFL_UNCOUPLED
-    ice_impedance = 1.
     top_z_level = get_top_z_level(nx, ny, nz, topo)
     do i = 1, nx
       do j = 1, ny
         if (top_z_level(i,j) > 0) then    ! ***** Subsurface level indexing convention *****
-          do k = 1, nlevgrnd              !    eCLM: 1=topmost layer, nlevsoi=deepest layer
+          do k = 1, nlevsoi               !    eCLM: 1=topmost layer, nlevsoi=deepest layer
             z = top_z_level(i,j) - (k-1)  ! ParFlow: 1=deepest layer, nz=topmost layer
             l = flattened_array_index(i, j, z, nx_f, ny_f)
-            if (k <= nlevsoi) evap_trans(l) = evap_trans_3d(i,j,k)
-            ice_impedance(l) = ice_impedance_3d(i,j,k)
+            evap_trans(l) = evap_trans_3d(i,j,k)
           end do
           do k = 1, nlevgrnd
             z = top_z_level(i,j) - (k-1)
@@ -245,7 +236,8 @@ contains
       end do
     end do
 
-    deallocate(evap_trans_3d, porosity_3d, ice_impedance_3d)
+    deallocate(porosity_3d)
+    deallocate(evap_trans_3d)
   end subroutine receive_fld2_clm
 
   function get_top_z_level(nx, ny, nz, topo)

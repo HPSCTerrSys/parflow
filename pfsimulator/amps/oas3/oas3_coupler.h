@@ -29,10 +29,10 @@ void send_fld2_clm(double *pressure, double *saturation, double *topo, int *ix, 
 
 #define receive_fld2_clm receive_fld2_clm_
 #ifdef HAVE_ECLM
-/* eCLM also sends the effective porosity and the soil ice impedance */
-#define CALL_receive_fld2_clm(evap_trans, porosity_recv, ice_impedance, topo, ix, iy, nx, ny, nz, nx_f, ny_f, pstep) \
-        receive_fld2_clm(evap_trans, porosity_recv, ice_impedance, topo, &ix, &iy, &nx, &ny, &nz, &nx_f, &ny_f, &pstep)
-void receive_fld2_clm(double *evap_trans, double *porosity_recv, double *ice_impedance, double *topo, int *ix, int*iy,
+/* eCLM also sends the effective porosity; ParFlow derives the ice impedance from it */
+#define CALL_receive_fld2_clm(evap_trans, porosity_recv, topo, ix, iy, nx, ny, nz, nx_f, ny_f, pstep) \
+        receive_fld2_clm(evap_trans, porosity_recv, topo, &ix, &iy, &nx, &ny, &nz, &nx_f, &ny_f, &pstep)
+void receive_fld2_clm(double *evap_trans, double *porosity_recv, double *topo, int *ix, int*iy,
                       int *nx, int *ny, int *nz, int *nx_f, int *ny_f, double *pstep);
 #else
 #define CALL_receive_fld2_clm(evap_trans, topo, ix, iy, nx, ny, nz, nx_f, ny_f, pstep) \
