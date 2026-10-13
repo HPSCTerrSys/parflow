@@ -69,6 +69,9 @@ typedef struct {
   double drop_tol;
   int max_iterations;
   int max_convergence_failures; /* maximum number of convergence failures that are allowed */
+#ifdef HAVE_ECLM
+  double ice_impedance_factor;  /* e_ice in imped calculation; 0 switches impedance off */
+#endif
   int lsm;                      /* land surface model */
   int terrain_following_grid;   /* @RMM flag for terrain following grid in NL fn eval, sets sslopes=toposl */
   int variable_dz;              /* @RMM flag for variable dz-multipliers */
@@ -274,6 +277,7 @@ typedef struct {
   int write_netcdf_satur;       /* write saturations? */
   int write_netcdf_evaptrans;   /* write evaptrans? */
   int write_netcdf_evaptrans_sum;       /* write evaptrans_sum? */
+  int write_netcdf_ice_impedance;       /* write soil ice impedance? */
   int write_netcdf_overland_sum;        /* write overland_sum? */
   int write_netcdf_overland_bc_flux;    /* write overland_bc_flux? */
   int write_netcdf_qx_overland;        /* write q_overlnd_x? */
@@ -331,6 +335,10 @@ typedef struct {
   Vector *mask;
 
   Vector *evap_trans;           /* sk: Vector that contains the sink terms from the land surface model */
+#ifdef HAVE_ECLM
+  Vector *porosity_recv;        /* effective porosity received from eCLM; 0 = uncoupled cell */
+  Vector *old_porosity_recv;    /* effective porosity at the previous coupling step */
+#endif
   Vector *evap_trans_sum;       /* running sum of evaporation and transpiration */
   Vector *overland_sum;
   Vector *ovrl_bc_flx;          /* vector containing outflow at the boundary */
@@ -549,6 +557,10 @@ SetupRichards(PFModule * this_module)
 
   /* Do turning bands (and other stuff maybe) */
   PFModuleInvokeType(SetProblemDataInvoke, set_problem_data, (problem_data));
+#ifdef HAVE_ECLM
+  /* Init with no porosity change (first coupled step carries no freeze term) */
+  PFVCopy(ProblemDataPorosity(problem_data), ProblemDataOldPorosity(problem_data));
+#endif
   ComputeTopAndBottom(problem, problem_data);
 
   if (public_xtra->print_top || public_xtra->write_silo_top)
@@ -1079,6 +1091,53 @@ SetupRichards(PFModule * this_module)
     /*sk Initialize LSM terms */
     instance_xtra->evap_trans = NewVectorType(grid, 1, 1, vector_cell_centered);
     InitVectorAll(instance_xtra->evap_trans, 0.0);
+
+#ifdef HAVE_ECLM
+    instance_xtra->porosity_recv = NewVectorType(grid, 1, 1, vector_cell_centered);
+    instance_xtra->old_porosity_recv = NewVectorType(grid, 1, 1, vector_cell_centered);
+    /* Must match PFL_UNCOUPLED in oas_pfl_mod.F90 */
+    InitVectorAll(instance_xtra->porosity_recv, -9999.0);
+    InitVectorAll(instance_xtra->old_porosity_recv, -9999.0);
+    InitVectorAll(ProblemDataIceLiqDelta(problem_data), 0.0);
+    InitVectorAll(ProblemDataIceImpedanceX(problem_data), 1.0);
+    InitVectorAll(ProblemDataIceImpedanceY(problem_data), 1.0);
+    InitVectorAll(ProblemDataIceImpedanceZ(problem_data), 1.0);
+
+    /* Keep the input porosity (eCLM watsat) to derive the ice fraction from the
+     * effective porosity. Zero outside the domain, thus also marks domain cells. */
+    {
+      GrGeomSolid *gr_domain = ProblemDataGrDomain(problem_data);
+      Vector *porosity = ProblemDataPorosity(problem_data);
+      Vector *static_porosity = ProblemDataStaticPorosity(problem_data);
+      Subvector *po_s, *spo_s;
+      double *po_d, *spo_d;
+      Subgrid *sg;
+      int i, j, k, r, is;
+      int ix, iy, iz, nx, ny, nz;
+
+      InitVectorAll(static_porosity, 0.0);
+      ForSubgridI(is, GridSubgrids(grid))
+      {
+        sg = GridSubgrid(grid, is);
+        po_s = VectorSubvector(porosity, is);
+        spo_s = VectorSubvector(static_porosity, is);
+        po_d = SubvectorData(po_s);
+        spo_d = SubvectorData(spo_s);
+
+        r = SubgridRX(sg);
+        ix = SubgridIX(sg); iy = SubgridIY(sg); iz = SubgridIZ(sg);
+        nx = SubgridNX(sg); ny = SubgridNY(sg); nz = SubgridNZ(sg);
+
+        GrGeomInLoop(i, j, k, gr_domain, r, ix, iy, iz, nx, ny, nz,
+        {
+          int ipo = SubvectorEltIndex(po_s, i, j, k);
+          spo_d[ipo] = po_d[ipo];
+        });
+      }
+      handle = InitVectorUpdate(static_porosity, VectorUpdateAll);
+      FinalizeVectorUpdate(handle);
+    }
+#endif
 
     if (public_xtra->evap_trans_file)
     {
@@ -1942,6 +2001,10 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
   Subgrid *subgrid;
   Subvector *p_sub, *s_sub, *et_sub, *m_sub, *po_sub, *dz_sub;
   double *pp, *sp, *et, *ms, *po_dat, *dz_dat;
+#ifdef HAVE_ECLM
+  Subvector *prcv_sub;
+  double *prcv_dat;
+#endif
   double sw_lat = .0;
   double sw_lon = .0;
 #endif
@@ -2147,6 +2210,7 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
       ForSubgridI(is, GridSubgrids(grid))
       {
         int ix, iy, nx, ny, nz, nx_f, ny_f;
+        double dz;
 
         subgrid = GridSubgrid(grid, is);
 
@@ -2157,15 +2221,18 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
         m_sub = VectorSubvector(instance_xtra->mask, is);
         po_sub = VectorSubvector(porosity, is);
         dz_sub = VectorSubvector(instance_xtra->dz_mult, is);
+#ifdef HAVE_ECLM
+        prcv_sub = VectorSubvector(instance_xtra->porosity_recv, is);
+#endif
 
         ix = SubgridIX(subgrid);
         iy = SubgridIY(subgrid);
         nx = SubgridNX(subgrid);
         ny = SubgridNY(subgrid);
         nz = SubgridNZ(subgrid);
+        dz = SubgridDZ(subgrid);
         nx_f = SubvectorNX(et_sub);
         ny_f = SubvectorNY(et_sub);
-
 
         sp = SubvectorData(s_sub);
         pp = SubvectorData(p_sub);
@@ -2173,15 +2240,26 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
         ms = SubvectorData(m_sub);
         po_dat = SubvectorData(po_sub);
         dz_dat = SubvectorData(dz_sub);
+#ifdef HAVE_ECLM
+        prcv_dat = SubvectorData(prcv_sub);
+#endif
         //CPS       amps_Printf("Calling oasis send/receive for time  %3.1f \n", t);
         CALL_send_fld2_clm(pp, sp, ms, ix, iy, nx, ny, nz, nx_f, ny_f,
-                           t, po_dat, dz_dat);
+                           t, po_dat, dz_dat, dz);
         amps_Sync(amps_CommWorld);
+#ifdef HAVE_ECLM
+        CALL_receive_fld2_clm(et, prcv_dat, ms, ix, iy, nx, ny, nz, nx_f, ny_f, t);
+#else
         CALL_receive_fld2_clm(et, ms, ix, iy, nx, ny, nz, nx_f, ny_f, t);
+#endif
       }
       amps_Sync(amps_CommWorld);
       handle = InitVectorUpdate(evap_trans, VectorUpdateAll);
       FinalizeVectorUpdate(handle);
+#ifdef HAVE_ECLM
+      handle = InitVectorUpdate(instance_xtra->porosity_recv, VectorUpdateAll);
+      FinalizeVectorUpdate(handle);
+#endif
 #endif // end to HAVE_OAS3 CALL
 
       // IMF: Added to include CLM dumps in file_number updating.
@@ -2993,10 +3071,150 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
                               problem_data));
         }
 
+#ifdef HAVE_ECLM
+        PFVCopy(porosity, ProblemDataOldPorosity(problem_data));
+#endif
         PFVCopy(instance_xtra->density, instance_xtra->old_density);
         PFVCopy(instance_xtra->saturation,
                 instance_xtra->old_saturation);
         PFVCopy(instance_xtra->pressure, instance_xtra->old_pressure);
+
+#ifdef HAVE_ECLM
+        /* Implement the effective porosity from eCLM. Cells eCLM does not couple keep
+         * the porosity ParFlow read from its own input. */
+        {
+          GrGeomSolid *gr_domain = ProblemDataGrDomain(problem_data);
+          Vector *old_porosity = ProblemDataOldPorosity(problem_data);
+          Vector *ice_liq_delta = ProblemDataIceLiqDelta(problem_data);
+          Subvector *po_s, *opo_s, *ild_s, *os_s, *rcv_s, *orcv_s;
+          double *po_d, *opo_d, *ild_d, *os_d, *rcv_d, *orcv_d;
+          Subgrid *sg;
+          int i, j, k, r, is;
+          int ix, iy, iz, nx, ny, nz;
+
+          /* Ice occupies h2osoi_ice/denice of pore volume but removes only
+           * h2osoi_ice/denh2o of liquid. */
+          const double ice_water_ratio = 0.917;
+          const double porosity_min = 0.01;
+          /* Threshold for non-coupled values. Needs to be <0 but rather close
+	   * due to interpolation artefacts. */
+          const double coupled_min = -0.01;
+
+          ForSubgridI(is, GridSubgrids(grid))
+          {
+            sg = GridSubgrid(grid, is);
+
+            po_s = VectorSubvector(porosity, is);
+            opo_s = VectorSubvector(old_porosity, is);
+            ild_s = VectorSubvector(ice_liq_delta, is);
+            os_s = VectorSubvector(instance_xtra->old_saturation, is);
+            rcv_s = VectorSubvector(instance_xtra->porosity_recv, is);
+            orcv_s = VectorSubvector(instance_xtra->old_porosity_recv, is);
+
+            po_d = SubvectorData(po_s);
+            opo_d = SubvectorData(opo_s);
+            ild_d = SubvectorData(ild_s);
+            os_d = SubvectorData(os_s);
+            rcv_d = SubvectorData(rcv_s);
+            orcv_d = SubvectorData(orcv_s);
+
+            r = SubgridRX(sg);
+            ix = SubgridIX(sg); iy = SubgridIY(sg); iz = SubgridIZ(sg);
+            nx = SubgridNX(sg); ny = SubgridNY(sg); nz = SubgridNZ(sg);
+
+            GrGeomInLoop(i, j, k, gr_domain, r, ix, iy, iz, nx, ny, nz,
+            {
+              int ipo = SubvectorEltIndex(po_s, i, j, k);
+              int is_ = SubvectorEltIndex(os_s, i, j, k);
+
+              if (rcv_d[ipo] > coupled_min)
+              {
+                /* No previous value means a fresh start or a restart: skip the freeze. */
+                ild_d[ipo] = (orcv_d[ipo] > coupled_min)
+                             ? (orcv_d[ipo] - rcv_d[ipo]) * ice_water_ratio
+                             : 0.0;
+
+                /* Cap the pore-space loss at the liquid left, so ice expansion cannot
+                 * demand a saturation above one. Releases once the cell has drained. */
+                double liq_target = opo_d[ipo] * os_d[is_] - ild_d[ipo];
+                po_d[ipo] = pfmax(pfmax(rcv_d[ipo], liq_target), porosity_min);
+              }
+              else
+              {
+                ild_d[ipo] = 0.0;
+              }
+            });
+          }
+
+          /* Ice impedance per cell face, as in eCLM: imped = 10^(-e_ice*icefrac) with
+           * icefrac = theta_ice/watsat = 1 - phi_eff/watsat, averaged over the two cells
+           * of the face. Uses the received porosity, thus so it follows the
+	   * ice eCLM have. Faces to cells outside the domain keep 1. */
+          if (public_xtra->ice_impedance_factor != 0.0)
+          {
+            const double e_ice = public_xtra->ice_impedance_factor;
+            const double icefrac_min = 1.0e-10;
+            Vector *static_porosity = ProblemDataStaticPorosity(problem_data);
+            Subvector *spo_s, *iix_s, *iiy_s, *iiz_s;
+            double *spo_d, *iix_d, *iiy_d, *iiz_d;
+            int sy, sz;
+
+/* Ice fraction of cell n, -1 where eCLM does not couple. Fractions below
+ * icefrac_min are remap round-off, so an ice-free cell gets exactly 1. */
+#define ICE_FRACTION(n) ((rcv_d[n] > coupled_min && spo_d[n] > 0.0) \
+                         ? ((1.0 - rcv_d[n] / spo_d[n] < icefrac_min) ? 0.0 \
+                            : pfmin(1.0 - rcv_d[n] / spo_d[n], 1.0)) : -1.0)
+/* With one coupled side, use it alone similar to eCLM column bottom treatment */
+#define FACE_ICE_FRACTION(fa, fb) (((fa) >= 0.0 && (fb) >= 0.0) \
+                                   ? 0.5 * ((fa) + (fb)) : pfmax(pfmax((fa), (fb)), 0.0))
+
+            ForSubgridI(is, GridSubgrids(grid))
+            {
+              sg = GridSubgrid(grid, is);
+
+              rcv_s = VectorSubvector(instance_xtra->porosity_recv, is);
+              spo_s = VectorSubvector(static_porosity, is);
+              iix_s = VectorSubvector(ProblemDataIceImpedanceX(problem_data), is);
+              iiy_s = VectorSubvector(ProblemDataIceImpedanceY(problem_data), is);
+              iiz_s = VectorSubvector(ProblemDataIceImpedanceZ(problem_data), is);
+
+              rcv_d = SubvectorData(rcv_s);
+              spo_d = SubvectorData(spo_s);
+              iix_d = SubvectorData(iix_s);
+              iiy_d = SubvectorData(iiy_s);
+              iiz_d = SubvectorData(iiz_s);
+
+              sy = SubvectorNX(rcv_s);
+              sz = SubvectorNY(rcv_s) * sy;
+
+              r = SubgridRX(sg);
+              ix = SubgridIX(sg); iy = SubgridIY(sg); iz = SubgridIZ(sg);
+              nx = SubgridNX(sg); ny = SubgridNY(sg); nz = SubgridNZ(sg);
+
+              GrGeomInLoop(i, j, k, gr_domain, r, ix, iy, iz, nx, ny, nz,
+              {
+                int ip = SubvectorEltIndex(rcv_s, i, j, k);
+                double f_c = ICE_FRACTION(ip);
+                double f_x = ICE_FRACTION(ip + 1);
+                double f_y = ICE_FRACTION(ip + sy);
+                double f_z = ICE_FRACTION(ip + sz);
+
+                /* Same face convention as FBx/FBy/FBz: [ip] is the face to ip+1, ip+sy, ip+sz */
+                iix_d[ip] = (spo_d[ip + 1] > 0.0) ? pow(10.0, -e_ice * FACE_ICE_FRACTION(f_c, f_x)) : 1.0;
+                iiy_d[ip] = (spo_d[ip + sy] > 0.0) ? pow(10.0, -e_ice * FACE_ICE_FRACTION(f_c, f_y)) : 1.0;
+                iiz_d[ip] = (spo_d[ip + sz] > 0.0) ? pow(10.0, -e_ice * FACE_ICE_FRACTION(f_c, f_z)) : 1.0;
+              });
+            }
+#undef ICE_FRACTION
+#undef FACE_ICE_FRACTION
+          }
+
+          PFVCopy(instance_xtra->porosity_recv, instance_xtra->old_porosity_recv);
+
+          handle = InitVectorUpdate(porosity, VectorUpdateAll);
+          FinalizeVectorUpdate(handle);
+        }
+#endif
       }
       else                      /* Not converged, so decrease time step */
       {
@@ -3713,6 +3931,7 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
           || public_xtra->write_netcdf_satur
           || public_xtra->write_netcdf_evaptrans
           || public_xtra->write_netcdf_evaptrans_sum
+          || public_xtra->write_netcdf_ice_impedance
           || public_xtra->write_netcdf_overland_sum
           || public_xtra->write_netcdf_overland_bc_flux)
       {
@@ -3926,6 +4145,16 @@ AdvanceRichards(PFModule * this_module, double start_time,      /* Starting time
         any_file_dumped = 1;
       }
 
+#ifdef HAVE_ECLM
+      if (public_xtra->write_netcdf_ice_impedance)
+      {
+        sprintf(nc_postfix, "%05d", instance_xtra->file_number);
+        WritePFNC(file_prefix, nc_postfix, t, ProblemDataIceImpedanceZ(problem_data),
+                  public_xtra->numVarTimeVariant, "ice_impedance", 3,
+                  false, public_xtra->numVarIni);
+        any_file_dumped = 1;
+      }
+#endif
 
       if (public_xtra->print_evaptrans_sum
           || public_xtra->write_silo_evaptrans_sum
@@ -4906,6 +5135,10 @@ TeardownRichards(PFModule * this_module)
 
   FreeVector(instance_xtra->q_overlnd_y);
   FreeVector(instance_xtra->evap_trans);
+#ifdef HAVE_ECLM
+  FreeVector(instance_xtra->porosity_recv);
+  FreeVector(instance_xtra->old_porosity_recv);
+#endif
 
   FreeVector(instance_xtra->evap_trans_sum);
   FreeVector(instance_xtra->overland_sum);
@@ -4986,6 +5219,15 @@ TeardownRichards(PFModule * this_module)
     int k;
 
     log_file = OpenLogFile("SolverRichards");
+#if defined(HAVE_CLM)
+    fprintf(log_file, "Coupled land surface model: internal CLM\n\n");
+#elif defined(HAVE_ECLM)
+    fprintf(log_file, "Coupled land surface model: eCLM (experimental)\n\n");
+#elif defined(HAVE_OAS3)
+    fprintf(log_file, "Coupled land surface model: CLM3.5\n\n");
+#else
+    fprintf(log_file, "Coupled land surface model: none\n\n");
+#endif
 
     if (start_count >= 0)
     {
@@ -6242,6 +6484,12 @@ SolverRichardsNewPublicXtra(char *name)
   sprintf(key, "%s.MaxConvergenceFailures", name);
   public_xtra->max_convergence_failures = GetIntDefault(key, 3);
 
+#ifdef HAVE_ECLM
+  /* Same default as e_ice in eCLM's clm_varcon.F90 */
+  sprintf(key, "%s.ECLM.IceImpedanceFactor", name);
+  public_xtra->ice_impedance_factor = GetDoubleDefault(key, 6.0);
+#endif
+
   if (public_xtra->max_convergence_failures > 9)
   {
     amps_Printf("Warning: Input variable <%s> \n", key);
@@ -6653,6 +6901,15 @@ SolverRichardsNewPublicXtra(char *name)
   }
   public_xtra->write_netcdf_evaptrans = switch_value;
 
+  sprintf(key, "NetCDF.WriteIceImpedance");
+  switch_name = GetStringDefault(key, "False");
+  switch_value = NA_NameToIndexExitOnError(switch_na, switch_name, key);
+  if (switch_value == 1)
+  {
+    public_xtra->numVarTimeVariant++;
+  }
+  public_xtra->write_netcdf_ice_impedance = switch_value;
+
   sprintf(key, "NetCDF.WriteEvapTransSum");
   switch_name = GetStringDefault(key, "False");
   switch_value = NA_NameToIndexExitOnError(switch_na, switch_name, key);
@@ -6760,6 +7017,7 @@ SolverRichardsNewPublicXtra(char *name)
   if (public_xtra->write_netcdf_press || public_xtra->write_netcdf_satur
       || public_xtra->write_netcdf_evaptrans
       || public_xtra->write_netcdf_evaptrans_sum
+      || public_xtra->write_netcdf_ice_impedance
       || public_xtra->write_netcdf_overland_sum
       || public_xtra->write_netcdf_overland_bc_flux)
 

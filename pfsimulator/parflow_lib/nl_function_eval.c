@@ -221,6 +221,10 @@ void NlFunctionEval(Vector *     pressure, /* Current pressure values */
   double      *q_overlnd_x_ = NULL, *q_overlnd_y_ = NULL;
 
   Vector      *porosity = ProblemDataPorosity(problem_data);
+#ifdef HAVE_ECLM
+  Vector      *old_porosity = ProblemDataOldPorosity(problem_data);
+  Vector      *ice_liq_delta = ProblemDataIceLiqDelta(problem_data);
+#endif
   Vector      *permeability_x = ProblemDataPermeabilityX(problem_data);
   Vector      *permeability_y = ProblemDataPermeabilityY(problem_data);
   Vector      *permeability_z = ProblemDataPermeabilityZ(problem_data);
@@ -244,6 +248,14 @@ void NlFunctionEval(Vector *     pressure, /* Current pressure values */
   Vector      *FBx = ProblemDataFBx(problem_data);
   Vector      *FBy = ProblemDataFBy(problem_data);
   Vector      *FBz = ProblemDataFBz(problem_data);
+#ifdef HAVE_ECLM
+  /* Soil ice impedance, applied on top of the flow barriers */
+  Vector      *IIx = ProblemDataIceImpedanceX(problem_data);
+  Vector      *IIy = ProblemDataIceImpedanceY(problem_data);
+  Vector      *IIz = ProblemDataIceImpedanceZ(problem_data);
+  Subvector   *IIx_sub, *IIy_sub, *IIz_sub;
+  double      *IIx_dat, *IIy_dat, *IIz_dat;
+#endif
   Subvector   *FBx_sub, *FBy_sub, *FBz_sub;  //@RMM
   double      *FBx_dat = NULL, *FBy_dat = NULL, *FBz_dat = NULL;   //@RMM
 
@@ -258,12 +270,18 @@ void NlFunctionEval(Vector *     pressure, /* Current pressure values */
   Subgrid     *subgrid;
 
   Subvector   *p_sub, *d_sub, *od_sub, *s_sub, *os_sub, *po_sub, *op_sub, *ss_sub, *et_sub;
+#ifdef HAVE_ECLM
+  Subvector   *opo_sub, *ild_sub;
+#endif
   Subvector   *f_sub, *rp_sub, *permx_sub, *permy_sub, *permz_sub;
 
   Grid        *grid = VectorGrid(pressure);
   Grid        *grid2d = VectorGrid(x_sl);
 
   double      *pp, *odp, *sp, *osp, *pop, *fp, *dp, *rpp, *opp, *ss, *et;
+#ifdef HAVE_ECLM
+  double      *opop, *ildp;
+#endif
   double      *permxp, *permyp, *permzp;
 
   // Velocity data jjb
@@ -338,6 +356,10 @@ void NlFunctionEval(Vector *     pressure, /* Current pressure values */
     s_sub = VectorSubvector(saturation, is);
     os_sub = VectorSubvector(old_saturation, is);
     po_sub = VectorSubvector(porosity, is);
+#ifdef HAVE_ECLM
+    opo_sub = VectorSubvector(old_porosity, is);
+    ild_sub = VectorSubvector(ice_liq_delta, is);
+#endif
     f_sub = VectorSubvector(fval, is);
 
     /* @RMM added to provide access to zmult */
@@ -389,6 +411,10 @@ void NlFunctionEval(Vector *     pressure, /* Current pressure values */
     opp = SubvectorData(op_sub);
     osp = SubvectorData(os_sub);
     pop = SubvectorData(po_sub);
+#ifdef HAVE_ECLM
+    opop = SubvectorData(opo_sub);
+    ildp = SubvectorData(ild_sub);
+#endif
     fp = SubvectorData(f_sub);
 
     GrGeomInLoop(i, j, k, gr_domain, r, ix, iy, iz, nx, ny, nz,
@@ -401,7 +427,14 @@ void NlFunctionEval(Vector *     pressure, /* Current pressure values */
       double del_x_slope = 1.0;
       double del_y_slope = 1.0;
 
+#ifdef HAVE_ECLM
+      /* Porosity varies over time, so storage terms cannot be factored.
+       * Ice_liq_delta is here to avoid double-counting on solver retries. */
+      fp[ip] = (sp[ip] * dp[ip] * pop[ipo] - osp[ip] * odp[ip] * opop[ipo]
+                + ildp[ipo] * dp[ip]) * vol * del_x_slope * del_y_slope * z_mult_dat[ip];
+#else
       fp[ip] = (sp[ip] * dp[ip] - osp[ip] * odp[ip]) * pop[ipo] * vol * del_x_slope * del_y_slope * z_mult_dat[ip];
+#endif
     });
   }
 
@@ -526,6 +559,14 @@ void NlFunctionEval(Vector *     pressure, /* Current pressure values */
     FBx_dat = SubvectorData(FBx_sub);
     FBy_dat = SubvectorData(FBy_sub);
     FBz_dat = SubvectorData(FBz_sub);
+#ifdef HAVE_ECLM
+    IIx_sub = VectorSubvector(IIx, is);
+    IIy_sub = VectorSubvector(IIy, is);
+    IIz_sub = VectorSubvector(IIz, is);
+    IIx_dat = SubvectorData(IIx_sub);
+    IIy_dat = SubvectorData(IIy_sub);
+    IIz_dat = SubvectorData(IIz_sub);
+#endif
 
     GrGeomInLoop(i, j, k, gr_domain, r, ix, iy, iz, nx, ny, nz,
     {
@@ -841,6 +882,11 @@ void NlFunctionEval(Vector *     pressure, /* Current pressure values */
       u_right = u_right * FBx_dat[ip];
       u_front = u_front * FBy_dat[ip];
       u_upper = u_upper * FBz_dat[ip];
+#ifdef HAVE_ECLM
+      u_right = u_right * IIx_dat[ip];
+      u_front = u_front * IIy_dat[ip];
+      u_upper = u_upper * IIz_dat[ip];
+#endif
 
       /* velocity data jjb */
       vx[vxi] = u_right / (ffx * z_mult_dat[ip] * del_y_slope);

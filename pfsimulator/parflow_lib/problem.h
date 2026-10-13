@@ -155,6 +155,15 @@ typedef struct {
 
   Vector         *porosity;
 
+#ifdef HAVE_ECLM
+  Vector         *old_porosity;       /* porosity used by previous timestep */
+  Vector         *ice_liq_delta;      /* liquid-equivalent volume frozen [-]  */
+  Vector         *static_porosity;    /* porosity from the input (eCLM watsat) */
+  Vector         *ice_impedance_x;    /* soil ice impedance on face ip|ip+1  [-] */
+  Vector         *ice_impedance_y;    /* soil ice impedance on face ip|ip+sy [-] */
+  Vector         *ice_impedance_z;    /* soil ice impedance on face ip|ip+sz [-] */
+#endif
+
   Vector         *specific_storage;   //sk
 
   Vector         *FBx;  //RMM
@@ -288,6 +297,14 @@ typedef struct {
 #define ProblemDataPermeabilityY(problem_data)  ((problem_data)->permeability_y)
 #define ProblemDataPermeabilityZ(problem_data)  ((problem_data)->permeability_z)
 #define ProblemDataPorosity(problem_data)       ((problem_data)->porosity)
+#ifdef HAVE_ECLM
+#define ProblemDataOldPorosity(problem_data)    ((problem_data)->old_porosity)
+#define ProblemDataIceLiqDelta(problem_data)    ((problem_data)->ice_liq_delta)
+#define ProblemDataStaticPorosity(problem_data) ((problem_data)->static_porosity)
+#define ProblemDataIceImpedanceX(problem_data)  ((problem_data)->ice_impedance_x)
+#define ProblemDataIceImpedanceY(problem_data)  ((problem_data)->ice_impedance_y)
+#define ProblemDataIceImpedanceZ(problem_data)  ((problem_data)->ice_impedance_z)
+#endif
 #define ProblemDataFBx(problem_data)            ((problem_data)->FBx)    //RMM
 #define ProblemDataFBy(problem_data)            ((problem_data)->FBy)    //RMM
 #define ProblemDataFBz(problem_data)            ((problem_data)->FBz)    //RMM

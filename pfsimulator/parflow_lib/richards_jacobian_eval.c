@@ -295,6 +295,14 @@ void    RichardsJacobianEval(
   Vector      *FBx = ProblemDataFBx(problem_data);
   Vector      *FBy = ProblemDataFBy(problem_data);
   Vector      *FBz = ProblemDataFBz(problem_data);
+#ifdef HAVE_ECLM
+  /* Soil ice impedance, applied on top of the flow barriers */
+  Vector      *IIx = ProblemDataIceImpedanceX(problem_data);
+  Vector      *IIy = ProblemDataIceImpedanceY(problem_data);
+  Vector      *IIz = ProblemDataIceImpedanceZ(problem_data);
+  Subvector   *IIx_sub, *IIy_sub, *IIz_sub;
+  double      *IIx_dat, *IIy_dat, *IIz_dat;
+#endif
   Subvector   *FBx_sub, *FBy_sub, *FBz_sub;    //@RMM
   double      *FBx_dat, *FBy_dat, *FBz_dat;     //@RMM
 
@@ -590,6 +598,14 @@ void    RichardsJacobianEval(
     FBx_dat = SubvectorData(FBx_sub);
     FBy_dat = SubvectorData(FBy_sub);
     FBz_dat = SubvectorData(FBz_sub);
+#ifdef HAVE_ECLM
+    IIx_sub = VectorSubvector(IIx, is);
+    IIy_sub = VectorSubvector(IIy, is);
+    IIz_sub = VectorSubvector(IIz, is);
+    IIx_dat = SubvectorData(IIx_sub);
+    IIy_dat = SubvectorData(IIy_sub);
+    IIz_dat = SubvectorData(IIz_sub);
+#endif
 
     GrGeomInLoop(i, j, k, gr_domain, r, ix, iy, iz, nx, ny, nz,
     {
@@ -662,6 +678,9 @@ void    RichardsJacobianEval(
       double x_coeff = FBx_dat[ip] * dt * ffx * (1.0 / dx) * z_mult_dat[ip]
                        * PMean(pp[ip], pp[ip + 1], permxp[ip], permxp[ip + 1])
                        / viscosity;
+#ifdef HAVE_ECLM
+      x_coeff *= IIx_dat[ip];
+#endif
 
 
       double sym_west_temp = (-x_coeff
@@ -692,6 +711,9 @@ void    RichardsJacobianEval(
       double y_coeff = FBy_dat[ip] * dt * ffy * (1.0 / dy) * z_mult_dat[ip]
                        * PMean(pp[ip], pp[ip + sy_v], permyp[ip], permyp[ip + sy_v])
                        / viscosity;
+#ifdef HAVE_ECLM
+      y_coeff *= IIy_dat[ip];
+#endif
 
       double sym_south_temp = -y_coeff
                               * RPMean(updir, 0.0, prod, prod_no) * y_dir_g_c; //RMM TFG contributions, SYMM
@@ -728,6 +750,9 @@ void    RichardsJacobianEval(
       double z_coeff = FBz_dat[ip] * dt * ffz
                        * PMeanDZ(permzp[ip], permzp[ip + sz_v], z_mult_dat[ip], z_mult_dat[ip + sz_v])
                        / viscosity;
+#ifdef HAVE_ECLM
+      z_coeff *= IIz_dat[ip];
+#endif
 
       double sym_lower_temp = -z_coeff * (1.0 / (dz * Mean(z_mult_dat[ip], z_mult_dat[ip + sz_v])))
                               * RPMean(lower_cond, upper_cond, prod,
