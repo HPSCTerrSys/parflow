@@ -38,6 +38,7 @@ if (${PARFLOW_HAVE_UMPIRE})
   list(APPEND COMMON_SRC_FILES
     amps_umpire_wrapper.cpp
   )
+  list(APPEND HEADER_FILES common/amps_umpire_wrapper.h)
 endif()
 
 # Prepend paths for common and AMPS transport layer
