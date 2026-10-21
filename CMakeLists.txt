@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 3.22)
 
-project (PARFLOW VERSION 3.14.1 LANGUAGES C Fortran CXX)
+project (PARFLOW VERSION 3.15.0 LANGUAGES C Fortran CXX)
 
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules/")
 
@@ -73,6 +73,8 @@ elseif(PARFLOW_ACCELERATOR_BACKEND STREQUAL "cuda")
       set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -G --ptxas-options=-v")
       set(CMAKE_CUDA_HOST_COMPILER mpicxx)
       message(STATUS "Found CUDA ${CMAKE_CUDA_COMPILER_VERSION} at ${CMAKE_CUDA_COMPILER}")
+  
+      find_package(CUDAToolkit)
     else(CMAKE_CUDA_COMPILER)
       message(FATAL_ERROR "ERROR: CUDA installation not found")
     endif(CMAKE_CUDA_COMPILER)
@@ -281,7 +283,7 @@ if ( ${PARFLOW_AMPS_LAYER} IN_LIST PARFLOW_AMPS_LAYER_REQUIRE_MPI )
 
 endif ( ${PARFLOW_AMPS_LAYER} IN_LIST PARFLOW_AMPS_LAYER_REQUIRE_MPI )
 
-option(PARFLOW_ENABLE_TCL "Enable Tcl-based tools and tests" "OFF")
+option(PARFLOW_ENABLE_TCL "Enable Tcl-based tools and tests" "ON")
 if (PARFLOW_ENABLE_TCL)
   find_package(TCL QUIET)
   if(TCL_FOUND)
